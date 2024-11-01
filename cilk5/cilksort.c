@@ -495,14 +495,10 @@ int main(int argc, char **argv) {
 
   struct timeval t1, t2;
   gettimeofday(&t1,0);
-  wsp_t w1, w2;
-  w1 = wsp_getworkspan();
   cilksort(array, tmp, size);
-  w2 = wsp_getworkspan();
   gettimeofday(&t2,0);
   unsigned long long runtime_ms = (todval(&t2)-todval(&t1))/1000;
   printf("%f\n", runtime_ms/1000.0);
-  wsp_dump(wsp_sub(w2, w1), "cilksort");
 
   if(check) {
     printf("Now check result ... \n");
