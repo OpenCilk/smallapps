@@ -43,7 +43,7 @@ strassen: getoptions.o strassen.o
 qsort: qsort.o
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-fft cholesky : LDLIBS += -lm
+fft cholesky heat : LDLIBS += -lm
 
 # qsort : CXXFLAGS += -falign-functions=32
 
@@ -58,8 +58,21 @@ qsortARGS=50000000
 rectmulARGS=-x 4096 -y 4096 -z 2048
 strassenARGS=-n 4096
 
+TRIALS=0 1 2 3 4
+
+check-qsort : qsort
+	$(foreach var,$(TRIALS),./$^ ${$^ARGS};)
+
+check-heat : heat
+	$(foreach var,$(TRIALS),./$^ ${$^ARGS};)
+
+check-nqueens : nqueens
+	./$^ ${$^ARGS} -c
+	$(foreach var,$(TRIALS),./$^ ${$^ARGS};)
+
 check-% : %
-	./$^ ${$^ARGS} $(EXTRA_RUNARGS)
+	./$^ -c
+	$(foreach var,$(TRIALS),./$^ ${$^ARGS};)
 
 check : $(patsubst %,check-%,$(ALL_TESTS))
 
