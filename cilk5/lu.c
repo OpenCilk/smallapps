@@ -33,10 +33,6 @@ unsigned long long todval (struct timeval *tp) {
     return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
 }
 
-#if CILKSAN
-#include "cilksan.h"
-#endif
-
 #ifdef SERIAL
 #include <cilk/cilk_stub.h>
 #endif

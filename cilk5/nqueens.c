@@ -6,10 +6,6 @@
 
 #include <cilk/cilk.h>
 
-#if CILKSAN
-#include "cilksan.h"
-#endif
-
 #ifdef SERIAL
 #include <cilk/cilk_stub.h>
 #endif

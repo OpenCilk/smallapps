@@ -33,10 +33,6 @@
 
 #include "getoptions.h"
 
-#if CILKSAN
-#include "cilksan.h"
-#endif
-
 unsigned long long todval (struct timeval *tp) {
     return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
 }

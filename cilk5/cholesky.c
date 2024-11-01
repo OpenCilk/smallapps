@@ -41,10 +41,6 @@
 
 #include "getoptions.h"
 
-#if CILKSAN
-#include "cilksan.h"
-#endif
-
 #if HAVE_MALLOC_H
 #include <malloc.h>
 #endif

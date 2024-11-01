@@ -41,14 +41,6 @@ CILKOPTFLAGS ?= -targetlibinfo -tti -tbaa -scoped-noalias -assumption-cache-trac
 # CILKOPTFLAGS ?= -O1
 LLCOPTFLAGS ?= $(OPTFLAGS)
 
-CILKTOOLS=../../../cilktools
-ifeq (1,$(CILKSAN))
-CFLAGS += -fsanitize=thread
-CXXFlags += -fsanitize=thread
-DETACH2CILK += -instrument-cilk
-LDFLAGS += -L $(CILKTOOLS)/lib -lcilksan
-endif
-
 %.pbc : %.c
 	$(CLANG) $(CFLAGS) $(CLANGOPTFLAGS) -c $< -emit-llvm -o $@
 
