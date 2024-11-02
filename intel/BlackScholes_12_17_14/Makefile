@@ -1,25 +1,15 @@
-#COMPILER ?= llvm-pir
-COMPILER ?= gcc
+COMPILER ?= clang
 
-# CXX := g++
 SRCDIR := src
 BUILDDIR := release
-EXTRA_CFLAGS ?=
-# LIBFLAGS := -fcilkplus $(EXTRA_LDFLAGS) # -vec-report1
-CILKFLAG ?= -fcilkplus
-LIBFLAGS := $(CILKFLAG) $(EXTRA_LDFLAGS) # -vec-report1
+CILKFLAG ?= -fopencilk
+LIBFLAGS := $(CILKFLAG) $(EXTRA_LDFLAGS)
 
 ifdef perf_num
 	EXTRA_CFLAGS += -D PERF_NUM
 endif
 
 TARGET := $(BUILDDIR)/BlackScholes
-
-# icpc: $(TARGET)
-
-# gcc: CXX := g++
-# gcc: CFLAGS := -O3 -mfpmath=sse -flto 
-# gcc: $(TARGET)
 
 SOURCES := $(wildcard $(SRCDIR)/*.cpp)
 OBJECTS := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o))

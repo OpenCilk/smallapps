@@ -1,13 +1,13 @@
-CC ?= gcc
-CXX ?= g++
+CC ?= clang
+CXX ?= clang++
 
-CFLAGS := -D__INTEL_COMPILER -O3 # -march=native
+CFLAGS := -O3 # -march=native
 
-CFLAGS += $(OPTFLAGS)
-CXXFLAGS += $(OPTFLAGS)
+CFLAGS += $(CILKFLAG) $(OPTFLAGS)
+CXXFLAGS += $(CILKFLAG) $(OPTFLAGS)
 
 LINK.o = $(CXX) $(LDFLAGS) $(TARGET_ARCH)
-LDFLAGS += # -lcilkrts
+LDFLAGS +=
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.cpp
 	@mkdir -p $(BUILDDIR)

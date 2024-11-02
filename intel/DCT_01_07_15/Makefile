@@ -1,14 +1,9 @@
-#COMPILER ?= llvm-pir
-COMPILER ?= gcc
+COMPILER ?= clang
 
-# CXX := g++
 SRCDIR := src
 BUILDDIR := release
-# CFLAGS := -O2 -xAVX 
-EXTRA_CFLAGS ?=
-# LIBFLAGS := -fcilkplus $(EXTRA_LDFLAGS) # -lcilkrts
-CILKFLAG ?= -fcilkplus
-LIBFLAGS := $(CILKFLAG) $(EXTRA_LDFLAGS) # -lcilkrts
+CILKFLAG ?= -fopencilk
+LIBFLAGS := $(CILKFLAG) $(EXTRA_LDFLAGS)
 option := res/nahelam.bmp res/nahelam1.bmp
 ifdef vecreport
 	CFLAGS += -vec-report1
@@ -19,16 +14,6 @@ ifdef perf_num
 endif
 
 TARGET := $(BUILDDIR)/DCT
-
-# icpc: $(TARGET)
-
-# ifneq ($(shell uname -s),Darwin)
-# gcc: CXX := g++
-# else
-# gcc: CXX := clang++
-# endif
-# gcc: CFLAGS := -O2 -mfpmath=sse -march=core-avx-i
-# gcc: $(TARGET)
 
 SOURCES := $(wildcard $(SRCDIR)/*.cpp)
 OBJECTS := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o))

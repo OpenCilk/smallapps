@@ -1,11 +1,8 @@
-COMPILER ?= gcc
+COMPILER ?= clang
 
-#CXX := g++
 SRCDIR := src
 BUILDDIR := release
-EXTRA_CFLAGS ?=
-# LIBFLAGS := -fcilkplus $(EXTRA_LDFLAGS) # -lcilkrts # -vec-report1
-CILKFLAG ?= -fcilkplus
+CILKFLAG ?= -fopencilk
 LIBFLAGS := $(CILKFLAG) $(EXTRA_LDFLAGS)
 
 ifdef perf_num

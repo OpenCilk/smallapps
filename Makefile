@@ -8,6 +8,7 @@ all:
 
 check:
 	make -C cilk5 check
+	make -C intel check
 
 clean:
 	make -C cilk5 clean
