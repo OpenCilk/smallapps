@@ -11,10 +11,11 @@
 //
 // ======================================================================================
 
+#include <cilk/cilk.h>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <cilk/cilk.h>
+#include <cstring>
 
 #ifdef _WIN32
 #include <intrin.h>

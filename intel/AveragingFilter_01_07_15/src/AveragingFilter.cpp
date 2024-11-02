@@ -14,6 +14,7 @@
 #include "timer.h"
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 
 #ifdef _WIN32
@@ -265,7 +266,7 @@ int read_process_write(char *input, char *output, int choice) {
   // cout<<"The time taken in number of ticks is "<<avg_ticks<<"\n";
   cout << avg_time << "\n";
 #else
-  cout << "The time taken in number of ticks is " << t.get_ticks() << "\n";
+  cout << "The time taken in number of ticks is " << t.get_time() << "\n";
 #endif
   // Closing all file handles and also freeing all the dynamically allocated
   // memory

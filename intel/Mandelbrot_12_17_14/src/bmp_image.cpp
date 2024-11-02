@@ -23,12 +23,12 @@
 #endif
 
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <istream>
-#include <cmath>
 #include <sstream>
-#include <string>
+
 
 using namespace io;
 
