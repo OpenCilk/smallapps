@@ -1,13 +1,14 @@
 #include "matrix.h"
+#include <cstdlib>
+#include <cstring>
+
 
 matrix_serial::matrix_serial(int size) {
   ptr = (float *)aligned_alloc(ALIGNMENT, sizeof(float) * size * size);
   memset(ptr, 0, sizeof(float) * size * size);
   row_size = size;
 }
-matrix_serial::~matrix_serial() {
-  free(ptr);
-}
+matrix_serial::~matrix_serial() { free(ptr); }
 
 void matrix_serial::create_identity() {
   int size = row_size * row_size;

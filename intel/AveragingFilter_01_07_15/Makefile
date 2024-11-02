@@ -12,16 +12,10 @@ ifdef vecreport
 endif
 
 ifdef perf_num
-	EXTRA_CFLAGS += -D PERF_NUM
+	CFLAGS += -D PERF_NUM
 endif
 
 TARGET := $(BUILDDIR)/AveragingFilter
-
-icpc: $(TARGET)
-
-gcc: CXX := g++
-gcc: CFLAGS := -O2 -mfpmath=sse -flto 
-gcc: $(TARGET)
 
 SOURCES := $(wildcard $(SRCDIR)/*.cpp)
 OBJECTS := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o))

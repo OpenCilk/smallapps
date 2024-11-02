@@ -1,7 +1,8 @@
 #define ALIGNMENT                                                              \
   32 // Set to 16 bytes for SSE architectures and 32 bytes for AVX architectures
+#include <cstring>
 #include <iostream>
-#include <string>
+
 using namespace std;
 class matrix_serial {
 public:
