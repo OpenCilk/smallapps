@@ -123,13 +123,12 @@ void mat_vec_mul(int m, int n, int rw, REAL *A, REAL *V, REAL *P, int add) {
  */
 void matrixmul(int n, REAL *A, int an, REAL *B, int bn, REAL *C, int cn) {
 
-  int i, j, k;
   REAL s;
 
-  for (i = 0; i < n; ++i)
-    for (j = 0; j < n; ++j) {
+  for (int i = 0; i < n; ++i)
+    for (int j = 0; j < n; ++j) {
       s = 0.0;
-      for (k = 0; k < n; ++k)
+      for (int k = 0; k < n; ++k)
         s += ELEM(A, an, i, k) * ELEM(B, bn, k, j);
 
       ELEM(C, cn, i, j) = s;

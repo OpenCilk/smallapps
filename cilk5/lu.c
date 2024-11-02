@@ -113,21 +113,15 @@ static void print_matrix(Matrix M, int nb) {
  */
 static int test_result(Matrix LU, Matrix M, int nb) {
 
-  int I, J, K, i, j, k;
-  double diff, max_diff;
-  double v;
-
-  /* Initialize test. */
-  max_diff = 0.0;
-
   printf("Now check result ...\n");
 
   /* Find maximum difference between any element of LU and M. */
-  for (i = 0; i < nb * BLOCK_SIZE; i++)
-    for (j = 0; j < nb * BLOCK_SIZE; j++) {
-      I = i / BLOCK_SIZE;
-      J = j / BLOCK_SIZE;
-      v = 0.0;
+  for (int i = 0; i < nb * BLOCK_SIZE; i++)
+    for (int j = 0; j < nb * BLOCK_SIZE; j++) {
+      int I = i / BLOCK_SIZE;
+      int J = j / BLOCK_SIZE;
+      double v = 0.0;
+      int K, k;
       for (k = 0; k < i && k <= j; k++) {
         K = k / BLOCK_SIZE;
         v += BLOCK(MATRIX(LU, I, K), i % BLOCK_SIZE,
@@ -140,7 +134,7 @@ static int test_result(Matrix LU, Matrix M, int nb) {
         v += BLOCK(MATRIX(LU, K, J), k % BLOCK_SIZE,
             j % BLOCK_SIZE);
       }
-      diff = fabs(BLOCK(MATRIX(M, I, J), i % BLOCK_SIZE,
+      double diff = fabs(BLOCK(MATRIX(M, I, J), i % BLOCK_SIZE,
             j % BLOCK_SIZE) - v);
       if (diff > 0.000001)
         return 0;
