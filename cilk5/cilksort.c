@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2000 Massachusetts Institute of Technology
  * Copyright (c) 2000 Matteo Frigo
+ * Copyright (c) 2024 Tao B. Schardl
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,7 +31,7 @@
  *
  *
  * The procedure cilkmerge does the following:
- *       
+ *
  *       cilkmerge(A[1..n], B[1..m], C[1..(n+m)]) =
  *          find the median of A \union B using binary
  *          search.  The binary search gives a pair
@@ -54,21 +55,19 @@
  * log factor in the critical path (left as homework).
  */
 
+#include "getoptions.h"
 #include <cilk/cilk.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
 
-#include "getoptions.h"
-
 #ifdef SERIAL
 #include <cilk/cilk_stub.h>
 #endif
 
-unsigned long long todval (struct timeval *tp) {
-    return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
+unsigned long long todval(struct timeval *tp) {
+  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
 }
 
 #ifndef RAND_MAX
@@ -79,8 +78,8 @@ typedef long ELM;
 
 /* MERGESIZE must be >= 2 */
 #define KILO 1024
-#define MERGESIZE (2*KILO)
-#define QUICKSIZE (2*KILO)
+#define MERGESIZE (2 * KILO)
+#define QUICKSIZE (2 * KILO)
 #define INSERTIONSIZE 20
 
 static unsigned long rand_nxt = 0;
@@ -91,10 +90,7 @@ static inline unsigned long my_rand(void) {
   return rand_nxt;
 }
 
-static inline void my_srand(unsigned long seed) {
-
-  rand_nxt = seed;
-}
+static inline void my_srand(unsigned long seed) { rand_nxt = seed; }
 
 static inline ELM med3(ELM a, ELM b, ELM c) {
 
@@ -165,13 +161,13 @@ static ELM *seqpart(ELM *low, ELM *high) {
     return curr_high - 1;
 }
 
-#define swap(a, b) \
-{ \
-  ELM tmp;\
-  tmp = a;\
-  a = b;\
-  b = tmp;\
-}
+#define swap(a, b)                                                             \
+  {                                                                            \
+    ELM tmp;                                                                   \
+    tmp = a;                                                                   \
+    a = b;                                                                     \
+    b = tmp;                                                                   \
+  }
 
 static void insertion_sort(ELM *low, ELM *high) {
 
@@ -202,8 +198,7 @@ void seqquick(ELM *low, ELM *high) {
   insertion_sort(low, high);
 }
 
-void seqmerge(ELM *low1, ELM *high1, 
-    ELM *low2, ELM *high2, ELM *lowdest) {
+void seqmerge(ELM *low1, ELM *high1, ELM *low2, ELM *high2, ELM *lowdest) {
 
   ELM a1, a2;
 
@@ -228,7 +223,7 @@ void seqmerge(ELM *low1, ELM *high1,
    * loading an element out of range.  While this is
    * probably not a problem in practice, yet I don't feel
    * comfortable with an incorrect algorithm.  Therefore,
-   * I use the 'fast' loop on the array (except for the last 
+   * I use the 'fast' loop on the array (except for the last
    * element) and the 'slow' loop for the rest, saving both
    * performance and correctness.
    */
@@ -276,13 +271,13 @@ void seqmerge(ELM *low1, ELM *high1,
   }
 }
 
-#define swap_indices(a, b) \
-{ \
-  ELM *tmp;\
-  tmp = a;\
-  a = b;\
-  b = tmp;\
-}
+#define swap_indices(a, b)                                                     \
+  {                                                                            \
+    ELM *tmp;                                                                  \
+    tmp = a;                                                                   \
+    a = b;                                                                     \
+    b = tmp;                                                                   \
+  }
 
 ELM *binsplit(ELM val, ELM *low, ELM *high) {
 
@@ -306,29 +301,28 @@ ELM *binsplit(ELM val, ELM *low, ELM *high) {
     return low;
 }
 
-void cilkmerge(ELM *low1, ELM *high1, 
-    ELM *low2, ELM *high2, ELM *lowdest) {
+void cilkmerge(ELM *low1, ELM *high1, ELM *low2, ELM *high2, ELM *lowdest) {
 
   /*
-   * Cilkmerge: Merges range [low1, high1] with range [low2, high2] 
-   * into the range [lowdest, ...]  
+   * Cilkmerge: Merges range [low1, high1] with range [low2, high2]
+   * into the range [lowdest, ...]
    */
 
   /*
    * We want to take the middle element (indexed by split1) from the
    * larger of the two arrays.  The following code assumes that split1
    * is taken from range [low1, high1].  So if [low1, high1] is
-   * actually the smaller range, we should swap it with [low2, high2] 
+   * actually the smaller range, we should swap it with [low2, high2]
    */
 
-  ELM *split1, *split2;	/*
-                         * where each of the ranges are broken for 
-                         * recursive merge 
+  ELM *split1, *split2; /*
+                         * where each of the ranges are broken for
+                         * recursive merge
                          */
-  long int lowsize;		/*
-                                 * total size of lower halves of two
-                                 * ranges - 2 
-                                 */
+  long int lowsize;     /*
+                         * total size of lower halves of two
+                         * ranges - 2
+                         */
 
   if (high2 - low2 > high1 - low1) {
     swap_indices(low1, low2);
@@ -349,22 +343,23 @@ void cilkmerge(ELM *low1, ELM *high1,
    * Basic approach: Find the middle element of one range (indexed by
    * split1). Find where this element would fit in the other range
    * (indexed by split 2). Then merge the two lower halves and the two
-   * upper halves. 
+   * upper halves.
    */
 
   split1 = ((high1 - low1 + 1) / 2) + low1;
   split2 = binsplit(*split1, low2, high2);
   lowsize = split1 - low1 + split2 - low2;
 
-  /* 
+  /*
    * directly put the splitting element into
    * the appropriate location
    */
   *(lowdest + lowsize + 1) = *split1;
 
-  cilk_spawn cilkmerge(low1, split1 - 1, low2, split2, lowdest);
-  cilkmerge(split1 + 1, high1, split2 + 1, high2, lowdest + lowsize + 2);
-  cilk_sync;
+  cilk_scope {
+    cilk_spawn cilkmerge(low1, split1 - 1, low2, split2, lowdest);
+    cilkmerge(split1 + 1, high1, split2 + 1, high2, lowdest + lowsize + 2);
+  }
 
   return;
 }
@@ -397,15 +392,16 @@ void cilksort(ELM *low, ELM *tmp, long size) {
   D = C + quarter;
   tmpD = tmpC + quarter;
 
-  cilk_spawn cilksort(A, tmpA, quarter);
-  cilk_spawn cilksort(B, tmpB, quarter);
-  cilk_spawn cilksort(C, tmpC, quarter);
-  cilksort(D, tmpD, size - 3 * quarter);
-  cilk_sync;
+  cilk_scope {
+    cilk_spawn cilksort(A, tmpA, quarter);
+    cilk_spawn cilksort(B, tmpB, quarter);
+    cilk_spawn cilksort(C, tmpC, quarter);
+    cilksort(D, tmpD, size - 3 * quarter);
+    cilk_sync;
 
-  cilk_spawn cilkmerge(A, A + quarter - 1, B, B + quarter - 1, tmpA);
-  cilkmerge(C, C + quarter - 1, D, low + size - 1, tmpC);
-  cilk_sync;
+    cilk_spawn cilkmerge(A, A + quarter - 1, B, B + quarter - 1, tmpA);
+    cilkmerge(C, C + quarter - 1, D, low + size - 1, tmpC);
+  }
 
   cilkmerge(tmpA, tmpC - 1, tmpC, tmpA + size - 1, A);
 
@@ -440,16 +436,16 @@ void fill_array(ELM *arr, unsigned long size) {
 
 int usage(void) {
 
-  fprintf(stderr, 
-      "\nUsage: cilksort [<cilk-options>] [-n size] [-c] [-benchmark] [-h]\n\n");
+  fprintf(stderr, "\nUsage: cilksort [<cilk-options>] [-n size] [-c] "
+                  "[-benchmark] [-h]\n\n");
   fprintf(stderr, "Cilksort is a parallel sorting algorithm, "
-      "donned \"Multisort\", which\n");
+                  "donned \"Multisort\", which\n");
   fprintf(stderr, "is a variant of ordinary mergesort.  "
-      "Multisort begins by dividing an\n");
+                  "Multisort begins by dividing an\n");
   fprintf(stderr, "array of elements in half and sorting each half.  "
-      "It then merges the\n");
+                  "It then merges the\n");
   fprintf(stderr, "two sorted halves back together, "
-      "but in a divide-and-conquer approach\n");
+                  "but in a divide-and-conquer approach\n");
   fprintf(stderr, "rather than the usual serial merge.\n\n");
 
   return -1;
@@ -469,38 +465,38 @@ int main(int argc, char **argv) {
   check = 0;
   size = 3000000;
 
-  get_options(argc, argv, specifiers, opt_types, 
-              &size, &check, &benchmark, &help);
+  get_options(argc, argv, specifiers, opt_types, &size, &check, &benchmark,
+              &help);
 
-  if(help)
+  if (help)
     return usage();
 
-  if(benchmark) {
+  if (benchmark) {
     switch (benchmark) {
-      case 1:		/* short benchmark options -- a little work */
-        size = 10000;
-        break;
-      case 2:		/* standard benchmark options */
-        size = 3000000;
-        break;
-      case 3:		/* long benchmark options -- a lot of work */
-        size = 4100000;
-        break;
+    case 1: /* short benchmark options -- a little work */
+      size = 10000;
+      break;
+    case 2: /* standard benchmark options */
+      size = 3000000;
+      break;
+    case 3: /* long benchmark options -- a lot of work */
+      size = 4100000;
+      break;
     }
   }
-  array = (ELM *) malloc(size * sizeof(ELM));
-  tmp = (ELM *) malloc(size * sizeof(ELM));
+  array = (ELM *)malloc(size * sizeof(ELM));
+  tmp = (ELM *)malloc(size * sizeof(ELM));
 
   fill_array(array, size);
 
   struct timeval t1, t2;
-  gettimeofday(&t1,0);
+  gettimeofday(&t1, 0);
   cilksort(array, tmp, size);
-  gettimeofday(&t2,0);
-  unsigned long long runtime_ms = (todval(&t2)-todval(&t1))/1000;
-  printf("%f\n", runtime_ms/1000.0);
+  gettimeofday(&t2, 0);
+  unsigned long long runtime_ms = (todval(&t2) - todval(&t1)) / 1000;
+  printf("%f\n", runtime_ms / 1000.0);
 
-  if(check) {
+  if (check) {
     printf("Now check result ... \n");
 
     success = 1;
@@ -508,9 +504,9 @@ int main(int argc, char **argv) {
       if (array[i] != i)
         success = 0;
 
-    if(!success)
+    if (!success)
       fprintf(stderr, "SORTING FAILURE!");
-    else 
+    else
       fprintf(stderr, "Sorting successful.");
   }
 
@@ -522,4 +518,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-

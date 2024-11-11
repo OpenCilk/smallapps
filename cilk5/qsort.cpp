@@ -6,6 +6,7 @@
  * An implementation of quicksort using Intel(R) Cilk(TM) Plus parallelization.
  *
  * Copyright (C) 2009-2010 Intel Corporation. All Rights Reserved.
+ * Copyright (c) 2024 Tao B. Schardl
  *
  * The source code contained or described herein and all
  * documents related to the source code ("Material") are owned by 
@@ -50,9 +51,10 @@ void sample_qsort(int * begin, int * end) {
     using std::swap;
     swap(*end, *middle);    // move pivot to middle
 
-    cilk_spawn sample_qsort(begin, middle);
-    sample_qsort(++middle, ++end); // Exclude pivot and restore end
-    cilk_sync;
+    cilk_scope {
+      cilk_spawn sample_qsort(begin, middle);
+      sample_qsort(++middle, ++end); // Exclude pivot and restore end
+    }
   }
 }
 

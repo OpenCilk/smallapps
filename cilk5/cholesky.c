@@ -13,6 +13,7 @@
 /*
  * Copyright (c) 2000 Massachusetts Institute of Technology
  * Copyright (c) 2000 Matteo Frigo
+ * Copyright (c) 2024 Tao B. Schardl
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,11 +33,11 @@
 
 #include <cilk/cilk.h>
 
-#include <math.h>
-#include <string.h>
-#include <stdio.h>
 #include <assert.h>
+#include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 
 #include "getoptions.h"
@@ -53,22 +54,19 @@
 #define RAND_MAX 32767
 #endif
 
-unsigned long long todval (struct timeval *tp) {
-    return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
+unsigned long long todval(struct timeval *tp) {
+  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
 }
 
-unsigned long rand_nxt = 0; 
+unsigned long rand_nxt = 0;
 
-int cilk_rand(void) { 
-  int result;
+int cilk_rand(void) {
   rand_nxt = rand_nxt * 1103515245 + 12345;
-  result = (rand_nxt >> 16) % ((unsigned int) RAND_MAX + 1);
+  int result = (rand_nxt >> 16) % ((unsigned int)RAND_MAX + 1);
   return result;
-} 
+}
 
-void cilk_srand(unsigned int seed) { 
-  rand_nxt = seed;
-} 
+void cilk_srand(unsigned int seed) { rand_nxt = seed; }
 
 /*************************************************************\
  * Basic types
@@ -76,12 +74,12 @@ void cilk_srand(unsigned int seed) {
 
 typedef double Real;
 
-#define BLOCK_DEPTH 2                /* logarithm base 2 of BLOCK_SIZE */
-#define BLOCK_SIZE  (1<<BLOCK_DEPTH) /* 4 seems to be the optimum */
+#define BLOCK_DEPTH 2                 /* logarithm base 2 of BLOCK_SIZE */
+#define BLOCK_SIZE (1 << BLOCK_DEPTH) /* 4 seems to be the optimum */
 
 typedef Real Block[BLOCK_SIZE][BLOCK_SIZE];
 
-#define BLOCK(B,I,J) (B[I][J])
+#define BLOCK(B, I, J) (B[I][J])
 
 #define _00 0
 #define _01 1
@@ -121,14 +119,12 @@ elem_daxmy (Real a, Real * x, Real * y, int n) {
 /*
  * block_schur - Compute Schur complement B' = B - AC.
  */
-static void
-block_schur_full (Block B, Block A, Block C) {
+static void block_schur_full(Block B, Block A, Block C) {
 
-  int i, j, k;
-  for (i = 0; i < BLOCK_SIZE; i++) {
-    for (j = 0; j < BLOCK_SIZE; j++) {
-      for (k = 0; k < BLOCK_SIZE; k++) {
-        BLOCK (B, i, j) -= BLOCK (A, i, k) * BLOCK (C, j, k);
+  for (int i = 0; i < BLOCK_SIZE; i++) {
+    for (int j = 0; j < BLOCK_SIZE; j++) {
+      for (int k = 0; k < BLOCK_SIZE; k++) {
+        BLOCK(B, i, j) -= BLOCK(A, i, k) * BLOCK(C, j, k);
       }
     }
   }
@@ -137,19 +133,16 @@ block_schur_full (Block B, Block A, Block C) {
 /*
  * block_schur - Compute Schur complement B' = B - AC.
  */
-static void
-block_schur_half (Block B, Block A, Block C) {
-
-  int i, j, k;
+static void block_schur_half(Block B, Block A, Block C) {
 
   /*
    * printf("schur half\n");
    */
   /* Compute Schur complement. */
-  for (i = 0; i < BLOCK_SIZE; i++) {
-    for (j = 0; j <= i /* BLOCK_SIZE */ ; j++) {
-      for (k = 0; k < BLOCK_SIZE; k++) {
-        BLOCK (B, i, j) -= BLOCK (A, i, k) * BLOCK (C, j, k);
+  for (int i = 0; i < BLOCK_SIZE; i++) {
+    for (int j = 0; j <= i /* BLOCK_SIZE */; j++) {
+      for (int k = 0; k < BLOCK_SIZE; k++) {
+        BLOCK(B, i, j) -= BLOCK(A, i, k) * BLOCK(C, j, k);
       }
     }
   }
@@ -159,18 +152,15 @@ block_schur_half (Block B, Block A, Block C) {
  * block_upper_solve - Perform substitution to solve for B' in
  * B'U = B.
  */
-static void
-block_backsub (Block B, Block U) {
-
-  int i, j, k;
+static void block_backsub(Block B, Block U) {
 
   /* Perform backward substitution. */
-  for (i = 0; i < BLOCK_SIZE; i++) {
-    for (j = 0; j < BLOCK_SIZE; j++) {
-      for (k = 0; k < i; k++) {
-        BLOCK (B, j, i) -= BLOCK (U, i, k) * BLOCK (B, j, k);  /* transpose? */
+  for (int i = 0; i < BLOCK_SIZE; i++) {
+    for (int j = 0; j < BLOCK_SIZE; j++) {
+      for (int k = 0; k < i; k++) {
+        BLOCK(B, j, i) -= BLOCK(U, i, k) * BLOCK(B, j, k); /* transpose? */
       }
-      BLOCK (B, j, i) /= BLOCK (U, i, i);
+      BLOCK(B, j, i) /= BLOCK(U, i, i);
     }
   }
 }
@@ -197,27 +187,23 @@ xblock_backsub (Block B, Block L) {
 /*
  * block_cholesky - Factor block B.
  */
-static void
-block_cholesky (Block B) {
+static void block_cholesky(Block B) {
 
-  int i, j, k;
-
-  for (k = 0; k < BLOCK_SIZE; k++) {
-    Real x;
-    if (BLOCK (B, k, k) < 0.0) {
-      printf ("sqrt error: %f\n", BLOCK (B, k, k));
-      printf ("matrix is probably not numerically stable\n");
+  for (int k = 0; k < BLOCK_SIZE; k++) {
+    if (BLOCK(B, k, k) < 0.0) {
+      printf("sqrt error: %f\n", BLOCK(B, k, k));
+      printf("matrix is probably not numerically stable\n");
       exit(9);
     }
-    x = sqrt (BLOCK (B, k, k));
-    for (i = k; i < BLOCK_SIZE; i++) {
-      BLOCK (B, i, k) /= x;
+    Real x = sqrt(BLOCK(B, k, k));
+    for (int i = k; i < BLOCK_SIZE; i++) {
+      BLOCK(B, i, k) /= x;
     }
-    for (j = k + 1; j < BLOCK_SIZE; j++) {
-      for (i = j; i < BLOCK_SIZE; i++) {
-        BLOCK (B, i, j) -= BLOCK (B, i, k) * BLOCK (B, j, k);
-        if (j > i && BLOCK (B, i, j) != 0.0) {
-          printf ("Upper not empty\n");
+    for (int j = k + 1; j < BLOCK_SIZE; j++) {
+      for (int i = j; i < BLOCK_SIZE; i++) {
+        BLOCK(B, i, j) -= BLOCK(B, i, k) * BLOCK(B, j, k);
+        if (j > i && BLOCK(B, i, j) != 0.0) {
+          printf("Upper not empty\n");
         }
       }
     }
@@ -227,14 +213,10 @@ block_cholesky (Block B) {
 /*
  * block_zero - zero block B.
  */
-static void
-block_zero (Block B) {
-
-  int i, k;
-
-  for (i = 0; i < BLOCK_SIZE; i++) {
-    for (k = 0; k < BLOCK_SIZE; k++) {
-      BLOCK (B, i, k) = 0.0;
+static void block_zero(Block B) {
+  for (int i = 0; i < BLOCK_SIZE; i++) {
+    for (int k = 0; k < BLOCK_SIZE; k++) {
+      BLOCK(B, i, k) = 0.0;
     }
   }
 }
@@ -246,29 +228,27 @@ block_zero (Block B) {
 /*
  * Create new leaf nodes (BLOCK_SIZE x BLOCK_SIZE submatrices)
  */
-static InternalNode *
-new_block_leaf (void) {
+static InternalNode *new_block_leaf(void) {
 
-  LeafNode *leaf = (LeafNode *) malloc (sizeof (LeafNode));
+  LeafNode *leaf = (LeafNode *)malloc(sizeof(LeafNode));
 
   if (leaf == NULL) {
-    printf ("out of memory!\n");
+    printf("out of memory!\n");
     exit(1);
   }
-  return (InternalNode *) leaf;
+  return (InternalNode *)leaf;
 }
 
 /*
  * Create internal node in quadtree representation
  */
-static InternalNode *
-new_internal (InternalNode * a00, InternalNode * a01,
-              InternalNode * a10, InternalNode * a11) {
+static InternalNode *new_internal(InternalNode *a00, InternalNode *a01,
+                                  InternalNode *a10, InternalNode *a11) {
 
-  InternalNode *node = (InternalNode *) malloc (sizeof (InternalNode));
+  InternalNode *node = (InternalNode *)malloc(sizeof(InternalNode));
 
   if (node == NULL) {
-    printf ("out of memory!\n");
+    printf("out of memory!\n");
     exit(1);
   }
   node->child[_00] = a00;
@@ -282,20 +262,18 @@ new_internal (InternalNode * a00, InternalNode * a01,
  * Duplicate matrix.  Resulting matrix may be laid out in memory
  * better than source matrix.
  */
-Matrix copy_matrix (int depth, Matrix a) {
-
-  Matrix r;
+Matrix copy_matrix(int depth, Matrix a) {
 
   if (!a) {
     return a;
   }
 
   if (depth == BLOCK_DEPTH) {
-    LeafNode *A = (LeafNode *) a;
+    LeafNode *A = (LeafNode *)a;
     LeafNode *R;
-    r = new_block_leaf();
-    R = (LeafNode *) r;
-    memcpy (R->block, A->block, sizeof (Block));
+    Matrix r = new_block_leaf();
+    R = (LeafNode *)r;
+    memcpy(R->block, A->block, sizeof(Block));
 
     return r;
   }
@@ -303,15 +281,14 @@ Matrix copy_matrix (int depth, Matrix a) {
   Matrix r00 = NULL, r01 = NULL, r10 = NULL, r11 = NULL;
 
   depth--;
+  cilk_scope {
+    r00 = cilk_spawn copy_matrix(depth, a->child[_00]);
+    r01 = cilk_spawn copy_matrix(depth, a->child[_01]);
+    r10 = cilk_spawn copy_matrix(depth, a->child[_10]);
+    r11 = copy_matrix(depth, a->child[_11]);
+  }
 
-  r00 = cilk_spawn copy_matrix(depth, a->child[_00]);
-  r01 = cilk_spawn copy_matrix(depth, a->child[_01]);
-  r10 = cilk_spawn copy_matrix(depth, a->child[_10]);
-  r11 = copy_matrix(depth, a->child[_11]);
-
-  cilk_sync;
-
-  r = new_internal (r00, r01, r10, r11);
+  Matrix r = new_internal(r00, r01, r10, r11);
 
   return r;
 }
@@ -319,21 +296,20 @@ Matrix copy_matrix (int depth, Matrix a) {
 /*
  * Deallocate matrix.
  */
-void
-free_matrix (int depth, Matrix a) {
+void free_matrix(int depth, Matrix a) {
 
   if (a == NULL)
     return;
   if (depth == BLOCK_DEPTH) {
-    free (a);
+    free(a);
   } else {
 
     depth--;
-    free_matrix (depth, a->child[_00]);
-    free_matrix (depth, a->child[_01]);
-    free_matrix (depth, a->child[_10]);
-    free_matrix (depth, a->child[_11]);
-    free (a);
+    free_matrix(depth, a->child[_00]);
+    free_matrix(depth, a->child[_01]);
+    free_matrix(depth, a->child[_10]);
+    free_matrix(depth, a->child[_11]);
+    free(a);
   }
 }
 
@@ -344,37 +320,32 @@ free_matrix (int depth, Matrix a) {
 /*
  * Get matrix element at row r, column c.
  */
-Real
-get_matrix (int depth, Matrix a, int r, int c) {
+Real get_matrix(int depth, Matrix a, int r, int c) {
 
-  assert (depth >= BLOCK_DEPTH);
-  assert (r < (1 << depth));
-  assert (c < (1 << depth));
+  assert(depth >= BLOCK_DEPTH);
+  assert(r < (1 << depth));
+  assert(c < (1 << depth));
 
   if (a == NULL)
     return 0.0;
 
   if (depth == BLOCK_DEPTH) {
-    LeafNode *A = (LeafNode *) a;
-    return BLOCK (A->block, r, c);
-
+    LeafNode *A = (LeafNode *)a;
+    return BLOCK(A->block, r, c);
   } else {
-    int mid;
-
     depth--;
-    mid = 1 << depth;
+    int mid = 1 << depth;
 
     if (r < mid) {
       if (c < mid)
-        return get_matrix (depth, a->child[_00], r, c);
+        return get_matrix(depth, a->child[_00], r, c);
       else
-        return get_matrix (depth, a->child[_01], r, c - mid);
-    }
-    else {
+        return get_matrix(depth, a->child[_01], r, c - mid);
+    } else {
       if (c < mid)
-        return get_matrix (depth, a->child[_10], r - mid, c);
+        return get_matrix(depth, a->child[_10], r - mid, c);
       else
-        return get_matrix (depth, a->child[_11], r - mid, c - mid);
+        return get_matrix(depth, a->child[_11], r - mid, c - mid);
     }
   }
 }
@@ -382,160 +353,142 @@ get_matrix (int depth, Matrix a, int r, int c) {
 /*
  * Set matrix element at row r, column c to value.
  */
-Matrix
-set_matrix (int depth, Matrix a, int r, int c, Real value) {
+Matrix set_matrix(int depth, Matrix a, int r, int c, Real value) {
 
-  assert (depth >= BLOCK_DEPTH);
-  assert (r < (1 << depth));
-  assert (c < (1 << depth));
+  assert(depth >= BLOCK_DEPTH);
+  assert(r < (1 << depth));
+  assert(c < (1 << depth));
 
   if (depth == BLOCK_DEPTH) {
     LeafNode *A;
     if (a == NULL) {
-      a = new_block_leaf ();
-      A = (LeafNode *) a;
-      block_zero (A->block);
+      a = new_block_leaf();
+      A = (LeafNode *)a;
+      block_zero(A->block);
 
     } else {
-      A = (LeafNode *) a;
+      A = (LeafNode *)a;
     }
-    BLOCK (A->block, r, c) = value;
+    BLOCK(A->block, r, c) = value;
 
   } else {
-    int mid;
-
     if (a == NULL)
-      a = new_internal (NULL, NULL, NULL, NULL);
+      a = new_internal(NULL, NULL, NULL, NULL);
 
     depth--;
-    mid = 1 << depth;
+    int mid = 1 << depth;
 
     if (r < mid) {
       if (c < mid)
-        a->child[_00] = set_matrix (depth, a->child[_00], r, c, value);
+        a->child[_00] = set_matrix(depth, a->child[_00], r, c, value);
       else
-        a->child[_01] = set_matrix (depth, a->child[_01],
-            r, c - mid, value);
+        a->child[_01] = set_matrix(depth, a->child[_01], r, c - mid, value);
 
     } else {
       if (c < mid)
-        a->child[_10] = set_matrix (depth, a->child[_10],
-            r - mid, c, value);
+        a->child[_10] = set_matrix(depth, a->child[_10], r - mid, c, value);
       else
-        a->child[_11] = set_matrix (depth, a->child[_11],
-            r - mid, c - mid, value);
+        a->child[_11] =
+            set_matrix(depth, a->child[_11], r - mid, c - mid, value);
     }
   }
 
   return a;
 }
 
-void
-print_matrix_aux (int depth, Matrix a, int r, int c) {
+void print_matrix_aux(int depth, Matrix a, int r, int c) {
 
   if (a == NULL)
     return;
 
   if (depth == BLOCK_DEPTH) {
-    LeafNode *A = (LeafNode *) a;
-    int i, j;
-    for (i = 0; i < BLOCK_SIZE; i++)
-      for (j = 0; j < BLOCK_SIZE; j++)
-        printf ("%6d %6d: %12f\n", r + i, c + j, BLOCK (A->block, i, j));
+    LeafNode *A = (LeafNode *)a;
+    for (int i = 0; i < BLOCK_SIZE; i++)
+      for (int j = 0; j < BLOCK_SIZE; j++)
+        printf("%6d %6d: %12f\n", r + i, c + j, BLOCK(A->block, i, j));
 
   } else {
-    int mid;
     depth--;
-    mid = 1 << depth;
-    print_matrix_aux (depth, a->child[_00], r, c);
-    print_matrix_aux (depth, a->child[_01], r, c + mid);
-    print_matrix_aux (depth, a->child[_10], r + mid, c);
-    print_matrix_aux (depth, a->child[_11], r + mid, c + mid);
+    int mid = 1 << depth;
+    print_matrix_aux(depth, a->child[_00], r, c);
+    print_matrix_aux(depth, a->child[_01], r, c + mid);
+    print_matrix_aux(depth, a->child[_10], r + mid, c);
+    print_matrix_aux(depth, a->child[_11], r + mid, c + mid);
   }
 }
 
 /*
  * Print matrix
  */
-void
-print_matrix (int depth, Matrix a) {
-  print_matrix_aux (depth, a, 0, 0);
-}
+void print_matrix(int depth, Matrix a) { print_matrix_aux(depth, a, 0, 0); }
 
 /*
  * Count number of blocks (leaves) in matrix representation
  */
-int
-num_blocks (int depth, Matrix a) {
+int num_blocks(int depth, Matrix a) {
 
-  int res;
   if (a == NULL)
     return 0;
   if (depth == BLOCK_DEPTH)
     return 1;
 
   depth--;
-  res = 0;
-  res += num_blocks (depth, a->child[_00]);
-  res += num_blocks (depth, a->child[_01]);
-  res += num_blocks (depth, a->child[_10]);
-  res += num_blocks (depth, a->child[_11]);
+  int res = 0;
+  res += num_blocks(depth, a->child[_00]);
+  res += num_blocks(depth, a->child[_01]);
+  res += num_blocks(depth, a->child[_10]);
+  res += num_blocks(depth, a->child[_11]);
   return res;
 }
 
 /*
  * Count number of nonzeros in matrix
  */
-int
-num_nonzeros (int depth, Matrix a) {
+int num_nonzeros(int depth, Matrix a) {
 
-  int res;
   if (a == NULL)
     return 0;
   if (depth == BLOCK_DEPTH) {
-    LeafNode *A = (LeafNode *) a;
-    int i, j;
-    res = 0;
-    for (i = 0; i < BLOCK_SIZE; i++) {
-      for (j = 0; j < BLOCK_SIZE; j++) {
-        if (BLOCK (A->block, i, j) != 0.0)
+    LeafNode *A = (LeafNode *)a;
+    int res = 0;
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+      for (int j = 0; j < BLOCK_SIZE; j++) {
+        if (BLOCK(A->block, i, j) != 0.0)
           res++;
       }
     }
     return res;
   }
   depth--;
-  res = 0;
-  res += num_nonzeros (depth, a->child[_00]);
-  res += num_nonzeros (depth, a->child[_01]);
-  res += num_nonzeros (depth, a->child[_10]);
-  res += num_nonzeros (depth, a->child[_11]);
+  int res = 0;
+  res += num_nonzeros(depth, a->child[_00]);
+  res += num_nonzeros(depth, a->child[_01]);
+  res += num_nonzeros(depth, a->child[_10]);
+  res += num_nonzeros(depth, a->child[_11]);
   return res;
 }
 
 /*
  * Compute sum of squares of elements of matrix
  */
-Real
-mag (int depth, Matrix a) {
+Real mag(int depth, Matrix a) {
 
   Real res = 0.0;
   if (!a)
     return res;
 
   if (depth == BLOCK_DEPTH) {
-    LeafNode *A = (LeafNode *) a;
-    int i, j;
-    for (i = 0; i < BLOCK_SIZE; i++)
-      for (j = 0; j < BLOCK_SIZE; j++)
-        res += BLOCK (A->block, i, j) * BLOCK (A->block, i, j);
+    LeafNode *A = (LeafNode *)a;
+    for (int i = 0; i < BLOCK_SIZE; i++)
+      for (int j = 0; j < BLOCK_SIZE; j++)
+        res += BLOCK(A->block, i, j) * BLOCK(A->block, i, j);
 
   } else {
     depth--;
-    res += mag (depth, a->child[_00]);
-    res += mag (depth, a->child[_01]);
-    res += mag (depth, a->child[_10]);
-    res += mag (depth, a->child[_11]);
+    res += mag(depth, a->child[_00]);
+    res += mag(depth, a->child[_01]);
+    res += mag(depth, a->child[_10]);
+    res += mag(depth, a->child[_11]);
   }
 
   return res;
@@ -549,28 +502,27 @@ mag (int depth, Matrix a) {
  * Perform R -= A * Transpose(B)
  * if lower==1, update only lower-triangular part of R
  */
-Matrix
-mul_and_subT (int depth, int lower, Matrix a, Matrix b, Matrix r) {
+Matrix mul_and_subT(int depth, int lower, Matrix a, Matrix b, Matrix r) {
 
-  assert (a != NULL && b != NULL);
+  assert(a != NULL && b != NULL);
 
   if (depth == BLOCK_DEPTH) {
-    LeafNode *A = (LeafNode *) a;
-    LeafNode *B = (LeafNode *) b;
+    LeafNode *A = (LeafNode *)a;
+    LeafNode *B = (LeafNode *)b;
     LeafNode *R;
 
     if (r == NULL) {
-      r = new_block_leaf ();
-      R = (LeafNode *) r;
-      block_zero (R->block);
+      r = new_block_leaf();
+      R = (LeafNode *)r;
+      block_zero(R->block);
 
     } else
-      R = (LeafNode *) r;
+      R = (LeafNode *)r;
 
     if (lower)
-      block_schur_half (R->block, A->block, B->block);
+      block_schur_half(R->block, A->block, B->block);
     else
-      block_schur_full (R->block, A->block, B->block);
+      block_schur_full(R->block, A->block, B->block);
 
     return r;
   }
@@ -592,57 +544,58 @@ mul_and_subT (int depth, int lower, Matrix a, Matrix b, Matrix r) {
     r11 = NULL;
   }
 
-  if (a->child[_00] && b->child[TR_00]) {
-    r00 = cilk_spawn mul_and_subT(depth, lower,
-        a->child[_00], b->child[TR_00], r00);
-  }
+  cilk_scope {
+    if (a->child[_00] && b->child[TR_00]) {
+      r00 = cilk_spawn mul_and_subT(depth, lower, a->child[_00],
+                                    b->child[TR_00], r00);
+    }
 
-  if (!lower && a->child[_00] && b->child[TR_01]) {
-    r01 = cilk_spawn mul_and_subT(depth, 0,
-        a->child[_00], b->child[TR_01], r01);
-  }
+    if (!lower && a->child[_00] && b->child[TR_01]) {
+      r01 = cilk_spawn mul_and_subT(depth, 0, a->child[_00], b->child[TR_01],
+                                    r01);
+    }
 
-  if (a->child[_10] && b->child[TR_00]) {
-    r10 = cilk_spawn mul_and_subT(depth, 0,
-        a->child[_10], b->child[TR_00], r10);
-  }
+    if (a->child[_10] && b->child[TR_00]) {
+      r10 = cilk_spawn mul_and_subT(depth, 0, a->child[_10], b->child[TR_00],
+                                    r10);
+    }
 
-  if (a->child[_10] && b->child[TR_01]) {
-    r11 = cilk_spawn mul_and_subT(depth, lower,
-        a->child[_10], b->child[TR_01], r11);
-  }
-  cilk_sync; 
+    if (a->child[_10] && b->child[TR_01]) {
+      r11 = cilk_spawn mul_and_subT(depth, lower, a->child[_10],
+                                    b->child[TR_01], r11);
+    }
+    cilk_sync;
 
-  if (a->child[_01] && b->child[TR_10]) {
-    r00 = cilk_spawn mul_and_subT(depth, lower,
-        a->child[_01], b->child[TR_10], r00);
-  }
+    if (a->child[_01] && b->child[TR_10]) {
+      r00 = cilk_spawn mul_and_subT(depth, lower, a->child[_01],
+                                    b->child[TR_10], r00);
+    }
 
-  if (!lower && a->child[_01] && b->child[TR_11]) {
-    r01 = cilk_spawn mul_and_subT(depth, 0,
-        a->child[_01], b->child[TR_11], r01);
-  }
+    if (!lower && a->child[_01] && b->child[TR_11]) {
+      r01 = cilk_spawn mul_and_subT(depth, 0, a->child[_01], b->child[TR_11],
+                                    r01);
+    }
 
-  if (a->child[_11] && b->child[TR_10]) {
-    r10 = cilk_spawn mul_and_subT(depth, 0,
-        a->child[_11], b->child[TR_10], r10);
-  }
+    if (a->child[_11] && b->child[TR_10]) {
+      r10 = cilk_spawn mul_and_subT(depth, 0, a->child[_11], b->child[TR_10],
+                                    r10);
+    }
 
-  if (a->child[_11] && b->child[TR_11]) {
-    r11 = cilk_spawn mul_and_subT(depth, lower,
-        a->child[_11], b->child[TR_11], r11);
+    if (a->child[_11] && b->child[TR_11]) {
+      r11 = cilk_spawn mul_and_subT(depth, lower, a->child[_11],
+                                    b->child[TR_11], r11);
+    }
   }
-  cilk_sync;
 
   if (r == NULL) {
     if (r00 || r01 || r10 || r11)
-      r = new_internal (r00, r01, r10, r11);
+      r = new_internal(r00, r01, r10, r11);
 
   } else {
-    assert (r->child[_00] == NULL || r->child[_00] == r00);
-    assert (r->child[_01] == NULL || r->child[_01] == r01);
-    assert (r->child[_10] == NULL || r->child[_10] == r10);
-    assert (r->child[_11] == NULL || r->child[_11] == r11);
+    assert(r->child[_00] == NULL || r->child[_00] == r00);
+    assert(r->child[_01] == NULL || r->child[_01] == r01);
+    assert(r->child[_10] == NULL || r->child[_10] == r10);
+    assert(r->child[_11] == NULL || r->child[_11] == r11);
     r->child[_00] = r00;
     r->child[_01] = r01;
     r->child[_10] = r10;
@@ -656,59 +609,56 @@ mul_and_subT (int depth, int lower, Matrix a, Matrix b, Matrix r) {
  * Perform substitution to solve for B in BL = A
  * Returns B in place of A.
  */
-Matrix
-backsub (int depth, Matrix a, Matrix l) {
+Matrix backsub(int depth, Matrix a, Matrix l) {
 
-  assert (a != NULL);
-  assert (l != NULL);
+  assert(a != NULL);
+  assert(l != NULL);
 
   if (depth == BLOCK_DEPTH) {
-    LeafNode *A = (LeafNode *) a;
-    LeafNode *L = (LeafNode *) l;
-    block_backsub (A->block, L->block);
+    LeafNode *A = (LeafNode *)a;
+    LeafNode *L = (LeafNode *)l;
+    block_backsub(A->block, L->block);
 
     return a;
   }
 
-  Matrix a00, a01, a10, a11;
-  Matrix l00, l10, l11;
-
   depth--;
 
-  a00 = a->child[_00];
-  a01 = a->child[_01];
-  a10 = a->child[_10];
-  a11 = a->child[_11];
+  Matrix a00 = a->child[_00];
+  Matrix a01 = a->child[_01];
+  Matrix a10 = a->child[_10];
+  Matrix a11 = a->child[_11];
 
-  l00 = l->child[_00];
-  l10 = l->child[_10];
-  l11 = l->child[_11];
+  Matrix l00 = l->child[_00];
+  Matrix l10 = l->child[_10];
+  Matrix l11 = l->child[_11];
 
-  assert (l00 && l11);
+  assert(l00 && l11);
 
-  if (a00) {
-    a00 = cilk_spawn backsub(depth, a00, l00);
-  }
-  if (a10) {
-    a10 = cilk_spawn backsub(depth, a10, l00);
-  }
-  cilk_sync;
+  cilk_scope {
+    if (a00) {
+      a00 = cilk_spawn backsub(depth, a00, l00);
+    }
+    if (a10) {
+      a10 = cilk_spawn backsub(depth, a10, l00);
+    }
+    cilk_sync;
 
-  if (a00 && l10) { 
-    a01 = cilk_spawn mul_and_subT(depth, 0, a00, l10, a01);
-  }
-  if (a10 && l10) { 
-    a11 = cilk_spawn mul_and_subT(depth, 0, a10, l10, a11);
-  }
-  cilk_sync;
+    if (a00 && l10) {
+      a01 = cilk_spawn mul_and_subT(depth, 0, a00, l10, a01);
+    }
+    if (a10 && l10) {
+      a11 = cilk_spawn mul_and_subT(depth, 0, a10, l10, a11);
+    }
+    cilk_sync;
 
-  if (a01) { 
-    a01 = cilk_spawn backsub(depth, a01, l11);
+    if (a01) {
+      a01 = cilk_spawn backsub(depth, a01, l11);
+    }
+    if (a11) {
+      a11 = cilk_spawn backsub(depth, a11, l11);
+    }
   }
-  if (a11) { 
-    a11 = cilk_spawn backsub(depth, a11, l11);
-  }
-  cilk_sync;
 
   a->child[_00] = a00;
   a->child[_01] = a01;
@@ -721,45 +671,43 @@ backsub (int depth, Matrix a, Matrix l) {
 /*
  * Compute Cholesky factorization of A.
  */
-Matrix
-cholesky (int depth, Matrix a) {
+Matrix cholesky(int depth, Matrix a) {
 
-  assert (a != NULL);
+  assert(a != NULL);
 
   if (depth == BLOCK_DEPTH) {
-    LeafNode *A = (LeafNode *) a;
-    block_cholesky (A->block);
+    LeafNode *A = (LeafNode *)a;
+    block_cholesky(A->block);
 
     return a;
   }
 
-  Matrix a00, a10, a11;
-
   depth--;
 
-  a00 = a->child[_00];
-  a10 = a->child[_10];
-  a11 = a->child[_11];
+  Matrix a00 = a->child[_00];
+  Matrix a10 = a->child[_10];
+  Matrix a11 = a->child[_11];
 
-  assert (a00);
+  assert(a00);
 
-  if(!a10) {
-    a00 = cilk_spawn cholesky(depth, a00);
-    a11 = cholesky (depth, a11);
-    cilk_sync;
+  if (!a10) {
+    cilk_scope {
+      a00 = cilk_spawn cholesky(depth, a00);
+      a11 = cholesky(depth, a11);
+    }
 
-  } else { 
-    a00 = cholesky (depth, a00);
-    assert (a00);
+  } else {
+    a00 = cholesky(depth, a00);
+    assert(a00);
 
-    a10 = backsub (depth, a10, a00);
-    assert (a10);
+    a10 = backsub(depth, a10, a00);
+    assert(a10);
 
-    a11 = mul_and_subT (depth, 1, a10, a10, a11);
-    assert (a11);
+    a11 = mul_and_subT(depth, 1, a10, a10, a11);
+    assert(a11);
 
-    a11 = cholesky (depth, a11);
-    assert (a11);
+    a11 = cholesky(depth, a11);
+    assert(a11);
   }
 
   a->child[_00] = a00;
@@ -769,8 +717,7 @@ cholesky (int depth, Matrix a) {
   return a;
 }
 
-int
-logarithm (int size) {
+int logarithm(int size) {
   int k = 0;
 
   while ((1 << k) < size)
@@ -778,116 +725,111 @@ logarithm (int size) {
   return k;
 }
 
-int
-usage (void) {
-  fprintf (stderr,
-           "\nUsage: cholesky [<cilk-options>] [-n size] [-z nonzeros]\n"
-           "                [-f filename] [-benchmark] [-h]\n\n"
-           "Default: cholesky -n 500 -z 1000\n\n"
-           "This program performs a divide and conquer Cholesky "
-           "factorization of a\n"
-           "sparse symmetric positive definite matrix (A=LL^T).  "
-           "Using the fact\n"
-           "that the matrix is symmetric, Cholesky does half the "
-           "number of\n"
-           "operations of LU.  The method used is the same as with LU, "
-           "with work\n"
-           "Theta(n^3) and critical path Theta(n lg(n)) for the "
-           "dense case.  A\n");
+int usage(void) {
+  fprintf(stderr, "\nUsage: cholesky [<cilk-options>] [-n size] [-z nonzeros]\n"
+                  "                [-f filename] [-benchmark] [-h]\n\n"
+                  "Default: cholesky -n 500 -z 1000\n\n"
+                  "This program performs a divide and conquer Cholesky "
+                  "factorization of a\n"
+                  "sparse symmetric positive definite matrix (A=LL^T).  "
+                  "Using the fact\n"
+                  "that the matrix is symmetric, Cholesky does half the "
+                  "number of\n"
+                  "operations of LU.  The method used is the same as with LU, "
+                  "with work\n"
+                  "Theta(n^3) and critical path Theta(n lg(n)) for the "
+                  "dense case.  A\n");
 
-  /* break the string into smaller pieces. ISO requires C89 compilers 
+  /* break the string into smaller pieces. ISO requires C89 compilers
    * to support at least 509-character strings */
-  fprintf (stderr,
-           "quad-tree is used to store the nonzero entries of the sparse\n"
-           "matrix. Actual work and critical path are influenced by "
-           "the sparsity\n pattern of the matrix.\n\n"
-           "The input matrix is either read from the provided file "
-           "or generated\n"
-           "randomly with size and nonzero-elements as specified.\n\n");
+  fprintf(stderr,
+          "quad-tree is used to store the nonzero entries of the sparse\n"
+          "matrix. Actual work and critical path are influenced by "
+          "the sparsity\n pattern of the matrix.\n\n"
+          "The input matrix is either read from the provided file "
+          "or generated\n"
+          "randomly with size and nonzero-elements as specified.\n\n");
   return 1;
 }
 
-const char *specifiers[] = { "-n", "-z", "-c", "-f", "-benchmark", "-h", 0 };
-int opt_types[] = { INTARG, INTARG, BOOLARG, STRINGARG, BENCHMARK, BOOLARG, 0 };
+const char *specifiers[] = {"-n", "-z", "-c", "-f", "-benchmark", "-h", 0};
+int opt_types[] = {INTARG, INTARG, BOOLARG, STRINGARG, BENCHMARK, BOOLARG, 0};
 
+int main(int argc, char *argv[]) {
 
-int main (int argc, char *argv[]) {
-
-  Matrix A, R;
-  int size, depth, nonzeros, i, benchmark, help, check = 1;
+  Matrix R;
+  int size, depth, nonzeros, benchmark, help, check = 1;
   int input_nonzeros, input_blocks, output_nonzeros, output_blocks;
   Real error = 0.0;
   char buf[1000], filename[100];
   int sizex, sizey;
   FILE *f;
 
-  A = NULL;
+  Matrix A = NULL;
 
   /* standard benchmark options */
   filename[0] = 0;
   size = 500;
   nonzeros = 1000;
 
-  get_options(argc, argv, specifiers, opt_types,
-          &size, &nonzeros, &check, filename, &benchmark, &help);
+  get_options(argc, argv, specifiers, opt_types, &size, &nonzeros, &check,
+              filename, &benchmark, &help);
 
-  if(help)
-    return usage ();
+  if (help)
+    return usage();
 
-  if(benchmark) {
-    switch(benchmark) {
-      case 1:    /* short benchmark options -- a little work */
-        filename[0] = 0;
-        size = 128;
-        nonzeros = 100;
-        break;
-      case 2:    /* standard benchmark options */
-        filename[0] = 0;
-        size = 1000;
-        nonzeros = 10000;
-        break;
-      case 3:    /* long benchmark options -- a lot of work */
-        filename[0] = 0;
-        size = 2000;
-        nonzeros = 10000;
-        break;
+  if (benchmark) {
+    switch (benchmark) {
+    case 1: /* short benchmark options -- a little work */
+      filename[0] = 0;
+      size = 128;
+      nonzeros = 100;
+      break;
+    case 2: /* standard benchmark options */
+      filename[0] = 0;
+      size = 1000;
+      nonzeros = 10000;
+      break;
+    case 3: /* long benchmark options -- a lot of work */
+      filename[0] = 0;
+      size = 2000;
+      nonzeros = 10000;
+      break;
     }
   }
 
-  if(filename[0]) {
-    f = fopen (filename, "r");
-    if(f == NULL) {
-      printf ("\nFile not found!\n\n");
+  if (filename[0]) {
+    f = fopen(filename, "r");
+    if (f == NULL) {
+      printf("\nFile not found!\n\n");
       return 1;
     }
     /* throw away comment lines */
     do
-      fgets (buf, 1000, f);
+      fgets(buf, 1000, f);
     while (buf[0] == '%');
 
-    sscanf (buf, "%d %d", &sizex, &sizey);
-    assert (sizex == sizey);
+    sscanf(buf, "%d %d", &sizex, &sizey);
+    assert(sizex == sizey);
     size = sizex;
 
-    depth = logarithm (size);
+    depth = logarithm(size);
 
-    srand (61066);
-    cilk_srand (61066);
+    srand(61066);
+    cilk_srand(61066);
 
     nonzeros = 0;
 
-    while(!feof (f)) {
+    while (!feof(f)) {
 
       double fr, fc;
-      int r, c;
       Real val;
-      int res;
 
-      fgets (buf, 1000, f);
+      fgets(buf, 1000, f);
 
-      res = sscanf (buf, "%lf %lf %lf", &fr, &fc, &val);
-      r = fr;
-      c = fc;
+      int res = sscanf(buf, "%lf %lf %lf", &fr, &fc, &val);
+      int r = fr;
+      int c = fc;
       if (res <= 0)
         break;
       /*
@@ -895,96 +837,94 @@ int main (int argc, char *argv[]) {
        * patterns. Then generate values randomly with a
        * nice big fat diagonal for Cholesky
        */
-      if (res == 2)
-      {
-        double rnd = ((double) rand ()) / (double) RAND_MAX;
+      if (res == 2) {
+        double rnd = ((double)rand()) / (double)RAND_MAX;
         val = (r == c ? 100000.0 * rnd : rnd);
       }
 
       r--;
       c--;
-      if (r < c)
-      {
+      if (r < c) {
         int t = r;
         r = c;
         c = t;
       }
-      assert (r >= c);
-      assert (r < size);
-      assert (c < size);
-      A = set_matrix (depth, A, r, c, val);
+      assert(r >= c);
+      assert(r < size);
+      assert(c < size);
+      A = set_matrix(depth, A, r, c, val);
       nonzeros++;
     }
 
   } else {
     /* generate random matrix */
 
-    depth = logarithm (size);
+    depth = logarithm(size);
 
     /* diagonal elements */
-    for(i = 0; i < size; i++) {
-      A = set_matrix (depth, A, i, i, 1.0);
+    for (int i = 0; i < size; i++) {
+      A = set_matrix(depth, A, i, i, 1.0);
     }
 
     /* off-diagonal elements */
-    for(i = 0; i < nonzeros - size; i++) {
+    for (int i = 0; i < nonzeros - size; i++) {
       int r, c;
-again:
-      r = cilk_rand () % size;
-      c = cilk_rand () % size;
+    again:
+      r = cilk_rand() % size;
+      c = cilk_rand() % size;
       if (r <= c)
         goto again;
-      if (get_matrix (depth, A, r, c) != 0.0)
+      if (get_matrix(depth, A, r, c) != 0.0)
         goto again;
-      A = set_matrix (depth, A, r, c, 0.1);
+      A = set_matrix(depth, A, r, c, 0.1);
     }
   }
 
   /* extend to power of two size with identity matrix */
-  for(i = size; i < (1 << depth); i++) { 
-    A = set_matrix (depth, A, i, i, 1.0);
+  for (int i = size; i < (1 << depth); i++) {
+    A = set_matrix(depth, A, i, i, 1.0);
   }
 
-  R = copy_matrix (depth, A);
+  R = copy_matrix(depth, A);
 
-  input_blocks = num_blocks (depth, R);
-  input_nonzeros = num_nonzeros (depth, R);
+  input_blocks = num_blocks(depth, R);
+  input_nonzeros = num_nonzeros(depth, R);
 
   struct timeval t1, t2;
-  gettimeofday(&t1,0);
+  gettimeofday(&t1, 0);
 
-  R = cholesky (depth, R);
+  R = cholesky(depth, R);
 
-  gettimeofday(&t2,0);
-  unsigned long long runtime_ms = (todval(&t2)-todval(&t1))/1000;
-  printf("%f\n", runtime_ms/1000.0);
+  gettimeofday(&t2, 0);
+  unsigned long long runtime_ms = (todval(&t2) - todval(&t1)) / 1000;
+  printf("%f\n", runtime_ms / 1000.0);
 
-  output_blocks = num_blocks (depth, R);
-  output_nonzeros = num_nonzeros (depth, R);
+  output_blocks = num_blocks(depth, R);
+  output_nonzeros = num_nonzeros(depth, R);
 
   /* test - make sure R * Transpose(R) == A */
   /* compute || A - R * Transpose(R) ||    */
 
-  if(check) {
-    printf ("Now check result ... \n");
-    A = mul_and_subT (depth, 1, R, R, A);
-    error = mag (depth, A);
-  }
-
-  fprintf (stderr, "\nCilk Example: cholesky\n");
   if (check) {
-    printf ("Error: %f\n\n", error);
+    printf("Now check result ... \n");
+    A = mul_and_subT(depth, 1, R, R, A);
+    error = mag(depth, A);
   }
 
-  fprintf (stderr, "Options: original size     = %d\n", size);
-  fprintf (stderr, "         original nonzeros = %d\n", nonzeros);
-  fprintf (stderr, "         input nonzeros    = %d\n", input_nonzeros);
-  fprintf (stderr, "         input blocks      = %d\n", input_blocks);
-  fprintf (stderr, "         output nonzeros   = %d\n", output_nonzeros);
-  fprintf (stderr, "         output blocks     = %d\n\n", output_blocks);
+  fprintf(stderr, "\nCilk Example: cholesky\n");
+  if (check) {
+    printf("Error: %f\n\n", error);
+  }
 
-  free_matrix (depth, A);
-  free_matrix (depth, R);
+  fprintf(stderr, "Options: original size     = %d\n", size);
+  fprintf(stderr, "         original nonzeros = %d\n", nonzeros);
+  fprintf(stderr, "         input nonzeros    = %d\n", input_nonzeros);
+  fprintf(stderr, "         input blocks      = %d\n", input_blocks);
+  fprintf(stderr, "         output nonzeros   = %d\n", output_nonzeros);
+  fprintf(stderr, "         output blocks     = %d\n\n", output_blocks);
+
+  free_matrix(depth, A);
+  free_matrix(depth, R);
 
   return 0;
 }

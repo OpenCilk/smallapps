@@ -19,12 +19,6 @@
 #include <cstdio>
 #include <cstdlib>
 
-// #include <xmmintrin.h>
-
-#ifndef USE_ALIGNED_ALLOC
-#define USE_ALIGNED_ALLOC true
-#endif
-
 // Print helper function
 void print_average(float *CallResult, float *PutResult, double time);
 

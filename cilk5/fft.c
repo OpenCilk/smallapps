@@ -6,6 +6,7 @@
 /*
  * Copyright (c) 2000 Massachusetts Institute of Technology
  * Copyright (c) 2000 Matteo Frigo
+ * Copyright (c) 2024 Tao B. Schardl
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,15 +25,13 @@
  */
 
 #include <cilk/cilk.h>
-
-#include <stdio.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/time.h>
 
-unsigned long long todval (struct timeval *tp) {
-    return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
+unsigned long long todval(struct timeval *tp) {
+  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
 }
 
 #include "getoptions.h"
@@ -40,7 +39,6 @@ unsigned long long todval (struct timeval *tp) {
 #ifdef SERIAL
 #include <cilk/cilk_stub.h>
 #endif
-
 
 /* Definitions and operations for complex numbers */
 
@@ -52,41 +50,34 @@ typedef struct {
   REAL re, im;
 } COMPLEX;
 
-#define c_re(c)  ((c).re)
-#define c_im(c)  ((c).im)
-
-/* apparently register storage specifier is deprecated */
-#define register
+#define c_re(c) ((c).re)
+#define c_im(c) ((c).im)
 
 /*
  * compute the W coefficients (that is, powers of the root of 1)
  * and store them into an array.
  */
-static void compute_w_coefficients(int n, int a, int b, COMPLEX * W) {
+static void compute_w_coefficients(int n, int a, int b, COMPLEX *W) {
 
-  register double twoPiOverN;
-  register int k;
-  register REAL s, c;
-
-  if(b - a < 128) {
-    twoPiOverN = 2.0 * 3.1415926535897932384626434 / n;
-    for(k = a; k <= b; ++k) {
-      c = cos(twoPiOverN * k);
+  if (b - a < 128) {
+    double twoPiOverN = 2.0 * 3.1415926535897932384626434 / n;
+    for (int k = a; k <= b; ++k) {
+      REAL c = cos(twoPiOverN * k);
       c_re(W[k]) = c_re(W[n - k]) = c;
-      s = sin(twoPiOverN * k);
+      REAL s = sin(twoPiOverN * k);
       c_im(W[k]) = -s;
       c_im(W[n - k]) = s;
     }
 
     return;
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn compute_w_coefficients(n, a, ab, W);
-  compute_w_coefficients(n, ab + 1, b, W);
-
-  cilk_sync;  
+  cilk_scope {
+    cilk_spawn compute_w_coefficients(n, a, ab, W);
+    compute_w_coefficients(n, ab + 1, b, W);
+  }
 
   return;
 }
@@ -97,21 +88,18 @@ static void compute_w_coefficients(int n, int a, int b, COMPLEX * W) {
  */
 static int factor(int n) {
 
-  int r;
-
-  if(n < 2)
+  if (n < 2)
     return 1;
 
-  if(n == 64 || n == 128 || n == 256 || n == 1024 || n == 2048
-      || n == 4096)
+  if (n == 64 || n == 128 || n == 256 || n == 1024 || n == 2048 || n == 4096)
     return 8;
-  if((n & 15) == 0)
+  if ((n & 15) == 0)
     return 16;
-  if((n & 7) == 0)
+  if ((n & 7) == 0)
     return 8;
-  if((n & 3) == 0)
+  if ((n & 3) == 0)
     return 4;
-  if((n & 1) == 0)
+  if ((n & 1) == 0)
     return 2;
 
 #if 0
@@ -122,26 +110,24 @@ static int factor(int n) {
 #endif
 
   /* try odd numbers up to n (computing the sqrt may be slower) */
-  for(r = 3; r < n; r += 2)
-    if(n % r == 0)
+  for (int r = 3; r < n; r += 2)
+    if (n % r == 0)
       return r;
 
   /* n is prime */
   return n;
 }
 
-static void unshuffle(int a, int b, COMPLEX * in, COMPLEX * out, int r, int m) {
+static void unshuffle(int a, int b, COMPLEX *in, COMPLEX *out, int r, int m) {
 
-  int i, j;
   int r4 = r & (~0x3);
-  const COMPLEX *ip;
-  COMPLEX *jp;
 
-  if(b - a < 16) {
-    ip = in + a * r;
-    for(i = a; i < b; ++i) {
-      jp = out + i;
-      for(j = 0; j < r4; j += 4) {
+  if (b - a < 16) {
+    const COMPLEX *ip = in + a * r;
+    for (int i = a; i < b; ++i) {
+      COMPLEX *jp = out + i;
+      int j;
+      for (j = 0; j < r4; j += 4) {
         jp[0] = ip[0];
         jp[m] = ip[1];
         jp[2 * m] = ip[2];
@@ -149,7 +135,7 @@ static void unshuffle(int a, int b, COMPLEX * in, COMPLEX * out, int r, int m) {
         jp += 4 * m;
         ip += 4;
       }
-      for(; j < r; ++j) {
+      for (; j < r; ++j) {
         *jp = *ip;
         ip++;
         jp += m;
@@ -157,34 +143,32 @@ static void unshuffle(int a, int b, COMPLEX * in, COMPLEX * out, int r, int m) {
     }
 
     return;
-
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn unshuffle(a, ab, in, out, r, m);
+  cilk_scope {
+    cilk_spawn unshuffle(a, ab, in, out, r, m);
 
-  unshuffle(ab, b, in, out, r, m);
-
-  cilk_sync;
+    unshuffle(ab, b, in, out, r, m);
+  }
 
   return;
 }
 
-static void fft_twiddle_gen1(COMPLEX * in, COMPLEX * out,
-                             COMPLEX * W, int r, int m,
-                             int nW, int nWdnti, int nWdntm) {
+static void fft_twiddle_gen1(COMPLEX *in, COMPLEX *out, COMPLEX *W, int r,
+                             int m, int nW, int nWdnti, int nWdntm) {
 
   int j, k;
   COMPLEX *jp, *kp;
 
-  for(k = 0, kp = out; k < r; ++k, kp += m) {
+  for (k = 0, kp = out; k < r; ++k, kp += m) {
     REAL r0, i0, rt, it, rw, iw;
     int l1 = nWdnti + nWdntm * k;
     int l0;
 
     r0 = i0 = 0.0;
-    for(j = 0, jp = in, l0 = 0; j < r; ++j, jp += m) {
+    for (j = 0, jp = in, l0 = 0; j < r; ++j, jp += m) {
       rw = c_re(W[l0]);
       iw = c_im(W[l0]);
       rt = c_re(*jp);
@@ -192,7 +176,7 @@ static void fft_twiddle_gen1(COMPLEX * in, COMPLEX * out,
       r0 += rt * rw - it * iw;
       i0 += rt * iw + it * rw;
       l0 += l1;
-      if(l0 > nW)
+      if (l0 > nW)
         l0 -= nW;
     }
 
@@ -203,28 +187,27 @@ static void fft_twiddle_gen1(COMPLEX * in, COMPLEX * out,
   return;
 }
 
-static void fft_twiddle_gen(int i, int i1,
-                            COMPLEX * in, COMPLEX * out, COMPLEX * W,
-                            int nW, int nWdn, int r, int m) {
+static void fft_twiddle_gen(int i, int i1, COMPLEX *in, COMPLEX *out,
+                            COMPLEX *W, int nW, int nWdn, int r, int m) {
 
-  if(i == i1 - 1) {
+  if (i == i1 - 1) {
     fft_twiddle_gen1(in + i, out + i, W, r, m, nW, nWdn * i, nWdn * m);
     return;
-  } 
+  }
 
   int i2 = (i + i1) / 2;
 
-  cilk_spawn fft_twiddle_gen(i, i2, in, out, W, nW, nWdn, r, m);
+  cilk_scope {
+    cilk_spawn fft_twiddle_gen(i, i2, in, out, W, nW, nWdn, r, m);
 
-  fft_twiddle_gen(i2, i1, in, out, W, nW, nWdn, r, m);
-
-  cilk_sync;
+    fft_twiddle_gen(i2, i1, in, out, W, nW, nWdn, r, m);
+  }
 
   return;
 }
 
 /* machine-generated code begins here */
-static void fft_base_2(COMPLEX * in, COMPLEX * out) {
+static void fft_base_2(COMPLEX *in, COMPLEX *out) {
 
   REAL r1_0, i1_0;
   REAL r1_1, i1_1;
@@ -238,15 +221,15 @@ static void fft_base_2(COMPLEX * in, COMPLEX * out) {
   c_im(out[1]) = (i1_0 - i1_1);
 }
 
-static void fft_twiddle_2(int a, int b, COMPLEX * in, COMPLEX * out,
-    COMPLEX * W, int nW, int nWdn, int m) {
+static void fft_twiddle_2(int a, int b, COMPLEX *in, COMPLEX *out, COMPLEX *W,
+                          int nW, int nWdn, int m) {
 
   int l1, i;
   COMPLEX *jp, *kp;
   REAL tmpr, tmpi, wr, wi;
 
-  if((b - a) < 128) {
-    for(i = a, l1 = nWdn * i, kp = out + i; i < b; i++, l1 += nWdn, kp++) {
+  if ((b - a) < 128) {
+    for (i = a, l1 = nWdn * i, kp = out + i; i < b; i++, l1 += nWdn, kp++) {
 
       jp = in + i;
 
@@ -269,29 +252,27 @@ static void fft_twiddle_2(int a, int b, COMPLEX * in, COMPLEX * out,
     }
 
     return;
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn fft_twiddle_2(a, ab, in, out, W, nW, nWdn, m);
+  cilk_scope {
+    cilk_spawn fft_twiddle_2(a, ab, in, out, W, nW, nWdn, m);
 
-  fft_twiddle_2(ab, b, in, out, W, nW, nWdn, m);
-
-  cilk_sync; 
+    fft_twiddle_2(ab, b, in, out, W, nW, nWdn, m);
+  }
 
   return;
 }
 
-static void fft_unshuffle_2(int a, int b, COMPLEX * in, 
-    COMPLEX * out, int m) {
+static void fft_unshuffle_2(int a, int b, COMPLEX *in, COMPLEX *out, int m) {
 
-  int i;
   const COMPLEX *ip;
   COMPLEX *jp;
 
-  if((b - a) < 128) {
+  if ((b - a) < 128) {
     ip = in + a * 2;
-    for(i = a; i < b; ++i) {
+    for (int i = a; i < b; ++i) {
       jp = out + i;
       jp[0] = ip[0];
       jp[m] = ip[1];
@@ -299,21 +280,20 @@ static void fft_unshuffle_2(int a, int b, COMPLEX * in,
     }
 
     return;
-
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn fft_unshuffle_2(a, ab, in, out, m);
+  cilk_scope {
+    cilk_spawn fft_unshuffle_2(a, ab, in, out, m);
 
-  fft_unshuffle_2(ab, b, in, out, m);
-
-  cilk_sync; 
+    fft_unshuffle_2(ab, b, in, out, m);
+  }
 
   return;
 }
 
-static void fft_base_4(COMPLEX * in, COMPLEX * out) {
+static void fft_base_4(COMPLEX *in, COMPLEX *out) {
 
   REAL r1_0, i1_0;
   REAL r1_1, i1_1;
@@ -353,15 +333,15 @@ static void fft_base_4(COMPLEX * in, COMPLEX * out) {
   c_im(out[3]) = (i1_2 + r1_3);
 }
 
-static void fft_twiddle_4(int a, int b, COMPLEX * in, COMPLEX * out,
-    COMPLEX * W, int nW, int nWdn, int m) {
+static void fft_twiddle_4(int a, int b, COMPLEX *in, COMPLEX *out, COMPLEX *W,
+                          int nW, int nWdn, int m) {
 
   int l1, i;
   COMPLEX *jp, *kp;
   REAL tmpr, tmpi, wr, wi;
 
-  if((b - a) < 128) {
-    for(i = a, l1 = nWdn * i, kp = out + i; i < b; i++, l1 += nWdn, kp++) {
+  if ((b - a) < 128) {
+    for (i = a, l1 = nWdn * i, kp = out + i; i < b; i++, l1 += nWdn, kp++) {
 
       jp = in + i;
       {
@@ -417,28 +397,27 @@ static void fft_twiddle_4(int a, int b, COMPLEX * in, COMPLEX * out,
     }
 
     return;
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn fft_twiddle_4(a, ab, in, out, W, nW, nWdn, m);
+  cilk_scope {
+    cilk_spawn fft_twiddle_4(a, ab, in, out, W, nW, nWdn, m);
 
-  fft_twiddle_4(ab, b, in, out, W, nW, nWdn, m);
-
-  cilk_sync; 
+    fft_twiddle_4(ab, b, in, out, W, nW, nWdn, m);
+  }
 
   return;
 }
 
-static void fft_unshuffle_4(int a, int b, COMPLEX * in, COMPLEX * out, int m) {
+static void fft_unshuffle_4(int a, int b, COMPLEX *in, COMPLEX *out, int m) {
 
-  int i;
   const COMPLEX *ip;
   COMPLEX *jp;
 
-  if((b - a) < 128) {
+  if ((b - a) < 128) {
     ip = in + a * 4;
-    for(i = a; i < b; ++i) {
+    for (int i = a; i < b; ++i) {
       jp = out + i;
       jp[0] = ip[0];
       jp[m] = ip[1];
@@ -450,20 +429,20 @@ static void fft_unshuffle_4(int a, int b, COMPLEX * in, COMPLEX * out, int m) {
     }
 
     return;
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn fft_unshuffle_4(a, ab, in, out, m);
+  cilk_scope {
+    cilk_spawn fft_unshuffle_4(a, ab, in, out, m);
 
-  fft_unshuffle_4(ab, b, in, out, m);
-
-  cilk_sync;
+    fft_unshuffle_4(ab, b, in, out, m);
+  }
 
   return;
 }
 
-static void fft_base_8(COMPLEX * in, COMPLEX * out) {
+static void fft_base_8(COMPLEX *in, COMPLEX *out) {
 
   REAL tmpr, tmpi;
   {
@@ -574,16 +553,15 @@ static void fft_base_8(COMPLEX * in, COMPLEX * out) {
   }
 }
 
-static void fft_twiddle_8(int a, int b, COMPLEX * in, COMPLEX * out,
-    COMPLEX * W, int nW, int nWdn, int m) {
+static void fft_twiddle_8(int a, int b, COMPLEX *in, COMPLEX *out, COMPLEX *W,
+                          int nW, int nWdn, int m) {
 
   int l1, i;
   COMPLEX *jp, *kp;
   REAL tmpr, tmpi, wr, wi;
 
-  if((b - a) < 128) {
-    for(i = a, l1 = nWdn * i, kp = out + i; i < b;
-        i++, l1 += nWdn, kp++) {
+  if ((b - a) < 128) {
+    for (i = a, l1 = nWdn * i, kp = out + i; i < b; i++, l1 += nWdn, kp++) {
       jp = in + i;
       {
         REAL r1_0, i1_0;
@@ -722,30 +700,26 @@ static void fft_twiddle_8(int a, int b, COMPLEX * in, COMPLEX * out,
     }
 
     return;
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn fft_twiddle_8(a, ab, in, out, W, nW, nWdn, m);
+  cilk_scope {
+    cilk_spawn fft_twiddle_8(a, ab, in, out, W, nW, nWdn, m);
 
-  fft_twiddle_8(ab, b, in, out, W, nW, nWdn, m);
-
-  cilk_sync; 
+    fft_twiddle_8(ab, b, in, out, W, nW, nWdn, m);
+  }
 
   return;
 }
 
-static void fft_unshuffle_8(int a, int b, COMPLEX * in, COMPLEX * out, int m) {
+static void fft_unshuffle_8(int a, int b, COMPLEX *in, COMPLEX *out, int m) {
 
-  int i;
-  const COMPLEX *ip;
-  COMPLEX *jp;
+  if ((b - a) < 128) {
+    const COMPLEX *ip = in + a * 8;
 
-  if((b - a) < 128) {
-    ip = in + a * 8;
-
-    for(i = a; i < b; ++i) {
-      jp = out + i;
+    for (int i = a; i < b; ++i) {
+      COMPLEX *jp = out + i;
       jp[0] = ip[0];
       jp[m] = ip[1];
       ip += 2;
@@ -764,20 +738,20 @@ static void fft_unshuffle_8(int a, int b, COMPLEX * in, COMPLEX * out, int m) {
     }
 
     return;
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn fft_unshuffle_8(a, ab, in, out, m);
+  cilk_scope {
+    cilk_spawn fft_unshuffle_8(a, ab, in, out, m);
 
-  fft_unshuffle_8(ab, b, in, out, m);
-
-  cilk_sync;
+    fft_unshuffle_8(ab, b, in, out, m);
+  }
 
   return;
 }
 
-static void fft_base_16(COMPLEX * in, COMPLEX * out) {
+static void fft_base_16(COMPLEX *in, COMPLEX *out) {
 
   REAL tmpr, tmpi;
 
@@ -1057,16 +1031,15 @@ static void fft_base_16(COMPLEX * in, COMPLEX * out) {
   }
 }
 
-static void fft_twiddle_16(int a, int b, COMPLEX * in, COMPLEX * out,
-    COMPLEX * W, int nW, int nWdn, int m) {
+static void fft_twiddle_16(int a, int b, COMPLEX *in, COMPLEX *out, COMPLEX *W,
+                           int nW, int nWdn, int m) {
 
   int l1, i;
   COMPLEX *jp, *kp;
   REAL tmpr, tmpi, wr, wi;
 
-  if((b - a) < 128) {
-    for(i = a, l1 = nWdn * i, kp = out + i; i < b;
-        i++, l1 += nWdn, kp++) {
+  if ((b - a) < 128) {
+    for (i = a, l1 = nWdn * i, kp = out + i; i < b; i++, l1 += nWdn, kp++) {
       jp = in + i;
       {
         REAL r1_0, i1_0;
@@ -1405,29 +1378,25 @@ static void fft_twiddle_16(int a, int b, COMPLEX * in, COMPLEX * out,
     }
 
     return;
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn fft_twiddle_16(a, ab, in, out, W, nW, nWdn, m);
+  cilk_scope {
+    cilk_spawn fft_twiddle_16(a, ab, in, out, W, nW, nWdn, m);
 
-  fft_twiddle_16(ab, b, in, out, W, nW, nWdn, m);
-
-  cilk_sync; 
+    fft_twiddle_16(ab, b, in, out, W, nW, nWdn, m);
+  }
 
   return;
 }
 
-static void fft_unshuffle_16(int a, int b, COMPLEX * in, COMPLEX * out, int m) {
+static void fft_unshuffle_16(int a, int b, COMPLEX *in, COMPLEX *out, int m) {
 
-  int i;
-  const COMPLEX *ip;
-  COMPLEX *jp;
-
-  if((b - a) < 128) {
-    ip = in + a * 16;
-    for(i = a; i < b; ++i) {
-      jp = out + i;
+  if ((b - a) < 128) {
+    const COMPLEX *ip = in + a * 16;
+    for (int i = a; i < b; ++i) {
+      COMPLEX *jp = out + i;
       jp[0] = ip[0];
       jp[m] = ip[1];
       ip += 2;
@@ -1462,20 +1431,20 @@ static void fft_unshuffle_16(int a, int b, COMPLEX * in, COMPLEX * out, int m) {
     }
 
     return;
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn fft_unshuffle_16(a, ab, in, out, m);
+  cilk_scope {
+    cilk_spawn fft_unshuffle_16(a, ab, in, out, m);
 
-  fft_unshuffle_16(ab, b, in, out, m);
-
-  cilk_sync; 
+    fft_unshuffle_16(ab, b, in, out, m);
+  }
 
   return;
 }
 
-static void fft_base_32(COMPLEX * in, COMPLEX * out) {
+static void fft_base_32(COMPLEX *in, COMPLEX *out) {
 
   REAL tmpr, tmpi;
   {
@@ -2154,15 +2123,15 @@ static void fft_base_32(COMPLEX * in, COMPLEX * out) {
   }
 }
 
-static void fft_twiddle_32(int a, int b, COMPLEX * in, COMPLEX * out,
-    COMPLEX * W, int nW, int nWdn, int m) {
+static void fft_twiddle_32(int a, int b, COMPLEX *in, COMPLEX *out, COMPLEX *W,
+                           int nW, int nWdn, int m) {
 
   int l1, i;
   COMPLEX *jp, *kp;
   REAL tmpr, tmpi, wr, wi;
 
-  if((b - a) < 128) {
-    for(i = a, l1 = nWdn * i, kp = out + i; i < b; i++, l1 += nWdn, kp++) {
+  if ((b - a) < 128) {
+    for (i = a, l1 = nWdn * i, kp = out + i; i < b; i++, l1 += nWdn, kp++) {
 
       jp = in + i;
 
@@ -2967,29 +2936,25 @@ static void fft_twiddle_32(int a, int b, COMPLEX * in, COMPLEX * out,
     }
 
     return;
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn fft_twiddle_32(a, ab, in, out, W, nW, nWdn, m);
+  cilk_scope {
+    cilk_spawn fft_twiddle_32(a, ab, in, out, W, nW, nWdn, m);
 
-  fft_twiddle_32(ab, b, in, out, W, nW, nWdn, m);
-
-  cilk_sync; 
+    fft_twiddle_32(ab, b, in, out, W, nW, nWdn, m);
+  }
 
   return;
 }
 
-static void fft_unshuffle_32(int a, int b, COMPLEX * in, COMPLEX * out, int m) {
+static void fft_unshuffle_32(int a, int b, COMPLEX *in, COMPLEX *out, int m) {
 
-  int i;
-  const COMPLEX *ip;
-  COMPLEX *jp;
-
-  if((b - a) < 128) {
-    ip = in + a * 32;
-    for(i = a; i < b; ++i) {
-      jp = out + i;
+  if ((b - a) < 128) {
+    const COMPLEX *ip = in + a * 32;
+    for (int i = a; i < b; ++i) {
+      COMPLEX *jp = out + i;
       jp[0] = ip[0];
       jp[m] = ip[1];
       ip += 2;
@@ -3056,15 +3021,15 @@ static void fft_unshuffle_32(int a, int b, COMPLEX * in, COMPLEX * out, int m) {
     }
 
     return;
-  } 
+  }
 
   int ab = (a + b) / 2;
 
-  cilk_spawn fft_unshuffle_32(a, ab, in, out, m);
+  cilk_scope {
+    cilk_spawn fft_unshuffle_32(a, ab, in, out, m);
 
-  fft_unshuffle_32(ab, b, in, out, m);
-
-  cilk_sync; 
+    fft_unshuffle_32(ab, b, in, out, m);
+  }
 
   return;
 }
@@ -3074,7 +3039,7 @@ static void fft_unshuffle_32(int a, int b, COMPLEX * in, COMPLEX * out, int m) {
 /*
  * Recursive complex FFT on the n complex components of the array in:
  * basic Cooley-Tukey algorithm, with some improvements for
- * n power of two. The result is placed in the array out. n is arbitrary. 
+ * n power of two. The result is placed in the array out. n is arbitrary.
  * The algorithm runs in time O(n*(r1 + ... + rk)) where r1, ..., rk
  * are prime numbers, and r1 * r2 * ... * rk = n.
  *
@@ -3086,88 +3051,78 @@ static void fft_unshuffle_32(int a, int b, COMPLEX * in, COMPLEX * out, int m) {
  * nW: size of W, that is, size of the original transform
  *
  */
-static void fft_aux(int n, COMPLEX * in, COMPLEX * out, int *factors,
-    COMPLEX * W, int nW) {
-
-  int r, m;
-  int k;
+static void fft_aux(int n, COMPLEX *in, COMPLEX *out, int *factors, COMPLEX *W,
+                    int nW) {
 
   /* special cases */
-  if(n == 32) {
+  if (n == 32) {
     fft_base_32(in, out);
     return;
   }
 
-  if(n == 16) {
+  if (n == 16) {
     fft_base_16(in, out);
     return;
   }
 
-  if(n == 8) {
+  if (n == 8) {
     fft_base_8(in, out);
     return;
   }
 
-  if(n == 4) {
+  if (n == 4) {
     fft_base_4(in, out);
     return;
   }
 
-  if(n == 2) {
+  if (n == 2) {
     fft_base_2(in, out);
     return;
   }
 
-  /* 
+  /*
    * the cases n == 3, n == 5, and maybe 7 should be implemented as well
    */
 
-  r = *factors;
-  m = n / r;
+  int r = *factors;
+  int m = n / r;
 
-  if(r < n) {
-    /* 
+  if (r < n) {
+    /*
      * split the DFT of length n into r DFTs of length n/r,  and
-     * recurse 
+     * recurse
      */
-    if(r == 32)
+    if (r == 32)
       fft_unshuffle_32(0, m, in, out, m);
-    else if(r == 16)
+    else if (r == 16)
       fft_unshuffle_16(0, m, in, out, m);
-    else if(r == 8)
+    else if (r == 8)
       fft_unshuffle_8(0, m, in, out, m);
-    else if(r == 4)
+    else if (r == 4)
       fft_unshuffle_4(0, m, in, out, m);
-    else if(r == 2)
+    else if (r == 2)
       fft_unshuffle_2(0, m, in, out, m);
     else
       unshuffle(0, m, in, out, r, m);
 
-    for(k = 0; k < n; k += m) {
-      cilk_spawn fft_aux(m, out + k, in + k, factors + 1, W, nW);
+    cilk_for(int k = 0; k < n; k += m) {
+      fft_aux(m, out + k, in + k, factors + 1, W, nW);
     }
-
-    cilk_sync;
-
-    /* cilk_for(int k = 0; k < n; k += m) { */
-    /*   fft_aux(m, out + k, in + k, factors + 1, W, nW); */
-    /* } */
-
   }
 
-  /* 
+  /*
    * now multiply by the twiddle factors, and perform m FFTs
    * of length r
    */
-  if(r == 2)
+  if (r == 2)
     fft_twiddle_2(0, m, in, out, W, nW, nW / n, m);
-  else if(r == 4)
+  else if (r == 4)
     fft_twiddle_4(0, m, in, out, W, nW, nW / n, m);
-  else if(r == 8)
+  else if (r == 8)
     fft_twiddle_8(0, m, in, out, W, nW, nW / n, m);
-  else if(r == 16)
+  else if (r == 16)
     fft_twiddle_16(0, m, in, out, W, nW, nW / n, m);
-  else if(r == 32)
+  else if (r == 32)
     fft_twiddle_32(0, m, in, out, W, nW, nW / n, m);
   else {
     fft_twiddle_gen(0, m, in, out, W, nW, nW / n, r, m);
@@ -3179,29 +3134,27 @@ static void fft_aux(int n, COMPLEX * in, COMPLEX * out, int *factors,
 /*
  * user interface for fft_aux
  */
-void cilk_fft(int n, COMPLEX * in, COMPLEX * out) {
+void cilk_fft(int n, COMPLEX *in, COMPLEX *out) {
 
-  int factors[40];		/* allows FFTs up to at least 3^40 */
+  int factors[40]; /* allows FFTs up to at least 3^40 */
   int *p = factors;
   int l = n;
-  int r;
-  COMPLEX *W;
+  COMPLEX *W = (COMPLEX *)malloc((n + 1) * sizeof(COMPLEX));
 
-  W = (COMPLEX *) malloc((n + 1) * sizeof(COMPLEX));
+  cilk_scope {
+    cilk_spawn compute_w_coefficients(n, 0, n / 2, W);
 
-  cilk_spawn compute_w_coefficients(n, 0, n / 2, W);
+    /*
+     * find factors of n, first 8, then 4 and then primes in ascending
+     * order
+     */
+    do {
+      int r = factor(l);
+      *p++ = r;
+      l /= r;
+    } while (l > 1);
 
-  /* 
-   * find factors of n, first 8, then 4 and then primes in ascending
-   * order 
-   */
-  do {
-    r = factor(l);
-    *p++ = r;
-    l /= r;
-  } while (l > 1);
-
-  cilk_sync;                    /* make sure W factors are computed */
+  } /* make sure W factors are computed */
 
   fft_aux(n, in, out, factors, W, n);
 
@@ -3219,15 +3172,14 @@ void cilk_fft(int n, COMPLEX * in, COMPLEX * out) {
 /*
  * trivial DFT algorithm O(n^2)
  */
-void test_fft_elem(int n, int j, COMPLEX * in, COMPLEX * out) {
+void test_fft_elem(int n, int j, COMPLEX *in, COMPLEX *out) {
 
-  int i;
   COMPLEX sum;
   COMPLEX w;
   REAL pi = 3.1415926535897932384626434;
   c_re(sum) = c_im(sum) = 0.0;
 
-  for(i = 0; i < n; ++i) {
+  for (int i = 0; i < n; ++i) {
     c_re(w) = cos((2.0 * pi * (i * j % n)) / n);
     c_im(w) = -sin((2.0 * pi * (i * j % n)) / n);
     c_re(sum) += c_re(in[i]) * c_re(w) - c_im(in[i]) * c_im(w);
@@ -3239,42 +3191,26 @@ void test_fft_elem(int n, int j, COMPLEX * in, COMPLEX * out) {
   return;
 }
 
-void test_fft(int n, COMPLEX * in, COMPLEX * out) {
+void test_fft(int n, COMPLEX *in, COMPLEX *out) {
 
-  int j = 0;
-
-  for(j = 0; j < n; ++j) {
-    cilk_spawn test_fft_elem(n, j, in, out);
-  }
-
-  cilk_sync;
-
-  /* cilk_for(int j = 0; j < n; ++j) { */
-  /*   test_fft_elem(n, j, in, out); */
-  /* } */
+  cilk_for(int j = 0; j < n; ++j) { test_fft_elem(n, j, in, out); }
 
   return;
 }
 
-
 #define max 800
 void test_correctness(void) {
 
-  COMPLEX *in1, *in2, *out1, *out2;
-  int n;
-  int i;
-  double error, a;
+  COMPLEX *in1 = (COMPLEX *)malloc(max * sizeof(COMPLEX));
+  COMPLEX *in2 = (COMPLEX *)malloc(max * sizeof(COMPLEX));
+  COMPLEX *out1 = (COMPLEX *)malloc(max * sizeof(COMPLEX));
+  COMPLEX *out2 = (COMPLEX *)malloc(max * sizeof(COMPLEX));
 
-  in1 = (COMPLEX *) malloc(max * sizeof(COMPLEX));
-  in2 = (COMPLEX *) malloc(max * sizeof(COMPLEX));
-  out1 = (COMPLEX *) malloc(max * sizeof(COMPLEX));
-  out2 = (COMPLEX *) malloc(max * sizeof(COMPLEX));
-
-  for(n = 1; n < max; ++n) {
+  for (int n = 1; n < max; ++n) {
     /* generate random inputs */
-    for(i = 0; i < n; ++i) {
-      c_re(in1[i]) = c_re(in2[i]) = i;		/* drand48(); */
-      c_im(in1[i]) = c_im(in2[i]) = 0.0;	/* drand48(); */
+    for (int i = 0; i < n; ++i) {
+      c_re(in1[i]) = c_re(in2[i]) = i;   /* drand48(); */
+      c_im(in1[i]) = c_im(in2[i]) = 0.0; /* drand48(); */
     }
 
     /* fft-ize */
@@ -3283,30 +3219,28 @@ void test_correctness(void) {
     test_fft(n, in2, out2);
 
     /* compute the relative error */
-    error = 0.0;
-    for(i = 0; i < n; ++i) {
-      double d;
-      a = sqrt((c_re(out1[i]) - c_re(out2[i])) *
-          (c_re(out1[i]) - c_re(out2[i])) +
-          (c_im(out1[i]) - c_im(out2[i])) *
-          (c_im(out1[i]) - c_im(out2[i])));
-      d =  sqrt(c_re(out2[i]) * c_re(out2[i]) + 
-          c_im(out2[i]) * c_im(out2[i]));
-      if(d < -1.0e-10 || d > 1.0e-10)
+    double error = 0.0;
+    for (int i = 0; i < n; ++i) {
+      double a = sqrt(
+          (c_re(out1[i]) - c_re(out2[i])) * (c_re(out1[i]) - c_re(out2[i])) +
+          (c_im(out1[i]) - c_im(out2[i])) * (c_im(out1[i]) - c_im(out2[i])));
+      double d =
+          sqrt(c_re(out2[i]) * c_re(out2[i]) + c_im(out2[i]) * c_im(out2[i]));
+      if (d < -1.0e-10 || d > 1.0e-10)
         a /= d;
-      if(a > error)
+      if (a > error)
         error = a;
     }
-    if(error > 1e-3) {
+    if (error > 1e-3) {
       printf("n=%d error=%e\n", n, error);
       printf("ct:\n");
-      for(i = 0; i < n; ++i)
+      for (int i = 0; i < n; ++i)
         printf("%f + %fi\n", c_re(out2[i]), c_im(out2[i]));
       printf("seq:\n");
-      for(i = 0; i < n; ++i)
+      for (int i = 0; i < n; ++i)
         printf("%f + %fi\n", c_re(out1[i]), c_im(out1[i]));
     }
-    if(n % 10 == 0)
+    if (n % 10 == 0)
       printf("n=%d ok\n", n);
   }
 
@@ -3315,24 +3249,21 @@ void test_correctness(void) {
 
 void test_speed(long size) {
 
-  COMPLEX *in, *out;
-  int i = 0;
-
-  in = (COMPLEX *) malloc(size * sizeof(COMPLEX));
-  out = (COMPLEX *) malloc(size * sizeof(COMPLEX));
+  COMPLEX *in = (COMPLEX *)malloc(size * sizeof(COMPLEX));
+  COMPLEX *out = (COMPLEX *)malloc(size * sizeof(COMPLEX));
 
   /* generate random input */
-  for(i = 0; i < size; ++i) {
+  for (int i = 0; i < size; ++i) {
     c_re(in[i]) = 1.0;
     c_im(in[i]) = 1.0;
   }
 
   struct timeval t1, t2;
-  gettimeofday(&t1,0);
+  gettimeofday(&t1, 0);
   cilk_fft(size, in, out);
-  gettimeofday(&t2,0);
-  unsigned long long runtime_ms = (todval(&t2)-todval(&t1))/1000;
-  printf("%f\n", runtime_ms/1000.0);
+  gettimeofday(&t2, 0);
+  unsigned long long runtime_ms = (todval(&t2) - todval(&t1)) / 1000;
+  printf("%f\n", runtime_ms / 1000.0);
 
   fprintf(stderr, "\ncilk example: fft\n");
   fprintf(stderr, "options:  number of elements   n = %ld\n\n", size);
@@ -3343,24 +3274,23 @@ void test_speed(long size) {
 
 int usage(void) {
 
-  fprintf(stderr, 
-      "\nusage: fft [<cilk-options>] [-n #] [-c] [-benchmark] [-h]\n\n");
-  fprintf(stderr, 
-      "this program is a highly optimized version of the classical\n");
-  fprintf(stderr, 
-      "cooley-tukey fast fourier transform algorithm.  "
-      "some documentation can\n");
-  fprintf(stderr, 
+  fprintf(stderr,
+          "\nusage: fft [<cilk-options>] [-n #] [-c] [-benchmark] [-h]\n\n");
+  fprintf(stderr,
+          "this program is a highly optimized version of the classical\n");
+  fprintf(stderr, "cooley-tukey fast fourier transform algorithm.  "
+                  "some documentation can\n");
+  fprintf(
+      stderr,
       "be found in the source code. the program is optimized for an exact\n");
-  fprintf(stderr, 
-      "power of 2.  to test for correctness use parameter -c.\n\n");
+  fprintf(stderr, "power of 2.  to test for correctness use parameter -c.\n\n");
   return 1;
 }
 
 const char *specifiers[] = {"-n", "-c", "-benchmark", "-h", 0};
 int opt_types[] = {LONGARG, BOOLARG, BENCHMARK, BOOLARG, 0};
 
-int main(int argc, char *argv[]) { 
+int main(int argc, char *argv[]) {
 
   int correctness, help, benchmark;
   long size;
@@ -3371,29 +3301,29 @@ int main(int argc, char *argv[]) {
 
   fprintf(stderr, "Testing cos: %f\n", cos(2.35));
 
-  get_options(argc, argv, specifiers, opt_types, &size, 
-      &correctness, &benchmark, &help);
+  get_options(argc, argv, specifiers, opt_types, &size, &correctness,
+              &benchmark, &help);
 
-  if(help)
+  if (help)
     return usage();
 
-  if(benchmark) {
+  if (benchmark) {
     switch (benchmark) {
-      case 1:		/* short benchmark options -- a little work */
-        // size = 512 * 512;
-        size = 16 * 1024 * 1024;
-        break;
-      case 2:		/* standard benchmark options */
-        // size = 1024 * 1024;
-        size = 32 * 1024 * 1024;
-        break;
-      case 3:		/* long benchmark options -- a lot of work */
-        //size = 4 * 1024 * 1024;
-        size = 64 * 1024 * 1024;
-        break;
+    case 1: /* short benchmark options -- a little work */
+      // size = 512 * 512;
+      size = 16 * 1024 * 1024;
+      break;
+    case 2: /* standard benchmark options */
+      // size = 1024 * 1024;
+      size = 32 * 1024 * 1024;
+      break;
+    case 3: /* long benchmark options -- a lot of work */
+      // size = 4 * 1024 * 1024;
+      size = 64 * 1024 * 1024;
+      break;
     }
   }
-  if(correctness)
+  if (correctness)
     test_correctness();
   else {
     test_speed(size);

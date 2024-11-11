@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 1994-2003 Massachusetts Institute of Technology
  * Copyright (c) 2003 Bradley C. Kuszmaul
- * Copyright (c) 2013 I-Ting Angelina Lee and Tao B. Schardl 
+ * Copyright (c) 2013 I-Ting Angelina Lee and Tao B. Schardl
+ * Copyright (c) 2024 Tao B. Schardl
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,12 +21,12 @@
  */
 
 #include <cilk/cilk.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/time.h>
 
-unsigned long long todval (struct timeval *tp) {
-    return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
+unsigned long long todval(struct timeval *tp) {
+  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
 }
 
 #ifdef SERIAL
@@ -33,39 +34,40 @@ unsigned long long todval (struct timeval *tp) {
 #endif
 
 int fib(int n) {
-    if (n < 2) { 
-        return (n);
+  if (n < 2) {
+    return (n);
 
-    } else {
-        /* int x = 0; */
-        /* int y = 0; */
-      int x, y;
-	x = cilk_spawn fib(n - 1);
-        y = fib(n - 2);
-        cilk_sync;
-
-        return (x + y);
+  } else {
+    /* int x = 0; */
+    /* int y = 0; */
+    int x, y;
+    cilk_scope {
+      x = cilk_spawn fib(n - 1);
+      y = fib(n - 2);
     }
+
+    return (x + y);
+  }
 }
 
 int main(int argc, char *argv[]) {
 
-    int n, result;
+  int n, result;
 
-    if (argc != 2) {
-        fprintf(stderr, "Usage: fib [<cilk options>] <n>\n");
-        exit(1); 
-    }
+  if (argc != 2) {
+    fprintf(stderr, "Usage: fib [<cilk options>] <n>\n");
+    exit(1);
+  }
 
-    n = atoi(argv[1]);
-    struct timeval t1, t2;
-    gettimeofday(&t1,0);
-    result = fib(n);
+  n = atoi(argv[1]);
+  struct timeval t1, t2;
+  gettimeofday(&t1, 0);
+  result = fib(n);
 
-    gettimeofday(&t2,0);
-    unsigned long long runtime_ms = (todval(&t2)-todval(&t1))/1000;
-    printf("%f\n", runtime_ms/1000.0);
+  gettimeofday(&t2, 0);
+  unsigned long long runtime_ms = (todval(&t2) - todval(&t1)) / 1000;
+  printf("%f\n", runtime_ms / 1000.0);
 
-    fprintf(stderr, "Result: %d\n", result);
-    return 0;
+  fprintf(stderr, "Result: %d\n", result);
+  return 0;
 }

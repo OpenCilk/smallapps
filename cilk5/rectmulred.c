@@ -1,6 +1,6 @@
-/* 
+/*
  * Program to multiply two rectangualar matrizes A(n,m) * B(m,n), where
- * (n < m) and (n mod 16 = 0) and (m mod n = 0). (Otherwise fill with 0s 
+ * (n < m) and (n mod 16 = 0) and (m mod n = 0). (Otherwise fill with 0s
  * to fit the shape.)
  *
  * written by Harald Prokop (prokop@mit.edu) Fall 97.
@@ -25,28 +25,23 @@
  *
  */
 
+#include "getoptions.h"
 #include <cilk/cilk.h>
-
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/time.h>
 
-#include "getoptions.h"
-
-unsigned long long todval (struct timeval *tp) {
-    return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
+unsigned long long todval(struct timeval *tp) {
+  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
 }
 
 #define BLOCK_EDGE 16
-#define BLOCK_SIZE (BLOCK_EDGE*BLOCK_EDGE)
+#define BLOCK_SIZE (BLOCK_EDGE * BLOCK_EDGE)
 
 typedef double DTYPE;
 
 typedef DTYPE block[BLOCK_SIZE];
 typedef block *pblock;
-
-// apparently register storage specifier is deprecated
-#define register
 
 /*
 double min;
@@ -55,20 +50,19 @@ int count;
 double sum;
 */
 
-/* compute R = R+AB, where R,A,B are BLOCK_EDGE x BLOCK_EDGE matricies 
+/* compute R = R+AB, where R,A,B are BLOCK_EDGE x BLOCK_EDGE matricies
  */
 long long mult_add_block(block *A, block *B, block *R) {
 
-  int i, j;
   long long flops = 0LL;
 
-  for (j = 0; j < 16; j += 2) {	/* 2 columns at a time */
-    DTYPE *bp = &((DTYPE *) B)[j];
-    for (i = 0; i < 16; i += 2) {		/* 2 rows at a time */
-      DTYPE *ap = &((DTYPE *) A)[i * 16];
-      DTYPE *rp = &((DTYPE *) R)[j + i * 16];
-      register DTYPE s0_0, s0_1;
-      register DTYPE s1_0, s1_1;
+  for (int j = 0; j < 16; j += 2) { /* 2 columns at a time */
+    DTYPE *bp = &((DTYPE *)B)[j];
+    for (int i = 0; i < 16; i += 2) { /* 2 rows at a time */
+      DTYPE *ap = &((DTYPE *)A)[i * 16];
+      DTYPE *rp = &((DTYPE *)R)[j + i * 16];
+      DTYPE s0_0, s0_1;
+      DTYPE s1_0, s1_1;
       s0_0 = rp[0];
       s0_1 = rp[1];
       s1_0 = rp[16];
@@ -148,21 +142,19 @@ long long mult_add_block(block *A, block *B, block *R) {
   return flops;
 }
 
-
-/* compute R = AB, where R,A,B are BLOCK_EDGE x BLOCK_EDGE matricies 
+/* compute R = AB, where R,A,B are BLOCK_EDGE x BLOCK_EDGE matricies
  */
 long long multiply_block(block *A, block *B, block *R) {
 
-  int i, j;
   long long flops = 0LL;
 
-  for (j = 0; j < 16; j += 2) {	/* 2 columns at a time */
-    DTYPE *bp = &((DTYPE *) B)[j];
-    for (i = 0; i < 16; i += 2) {		/* 2 rows at a time */
-      DTYPE *ap = &((DTYPE *) A)[i * 16];
-      DTYPE *rp = &((DTYPE *) R)[j + i * 16];
-      register DTYPE s0_0, s0_1;
-      register DTYPE s1_0, s1_1;
+  for (int j = 0; j < 16; j += 2) { /* 2 columns at a time */
+    DTYPE *bp = &((DTYPE *)B)[j];
+    for (int i = 0; i < 16; i += 2) { /* 2 rows at a time */
+      DTYPE *ap = &((DTYPE *)A)[i * 16];
+      DTYPE *rp = &((DTYPE *)R)[j + i * 16];
+      DTYPE s0_0, s0_1;
+      DTYPE s1_0, s1_1;
       s0_0 = ap[0] * bp[0];
       s0_1 = ap[0] * bp[1];
       s1_0 = ap[16] * bp[0];
@@ -238,196 +230,190 @@ long long multiply_block(block *A, block *B, block *R) {
   return flops;
 }
 
-
-/* Checks if each A[i,j] of a martix A of size nb x nb blocks has value v 
+/* Checks if each A[i,j] of a martix A of size nb x nb blocks has value v
  */
-void check_block (block *R, DTYPE v, int* errorf) {
+void check_block(block *R, DTYPE v, int *errorf) {
 
-  int i;
   int error = 0;
 
   // fprintf(stderr, "R: %lx.\n", R);
-  for (i = 0; i < BLOCK_SIZE; i++) 
-    if (((DTYPE *) R)[i] != v) {
-      if( i == 0 ) 
+  for (int i = 0; i < BLOCK_SIZE; i++)
+    if (((DTYPE *)R)[i] != v) {
+      if (i == 0)
         fprintf(stderr, "R[%d]: %lf != %lf.\n", i, ((DTYPE *)R)[i], v);
-      //return 1;
+      // return 1;
       error++;
     }
 
   *errorf = 1;
 }
 
-int compare_block (block *R, block *B) {
+int compare_block(block *R, block *B) {
 
-  int i;
   int error = 0;
 
   // fprintf(stderr, "R: %lx.\n", R);
-  for (i = 0; i < BLOCK_SIZE; i++) 
-    if (((DTYPE *) R)[i] != ((DTYPE *) B)[i] ) {
-      if( i == 0 ) 
-        fprintf(stderr, "(R[%d]) %lf != %lf (B[%d]).\n", 
-            i, ((DTYPE *)R)[i], ((DTYPE *)B)[i], i);
-      //return 1;
+  for (int i = 0; i < BLOCK_SIZE; i++)
+    if (((DTYPE *)R)[i] != ((DTYPE *)B)[i]) {
+      if (i == 0)
+        fprintf(stderr, "(R[%d]) %lf != %lf (B[%d]).\n", i, ((DTYPE *)R)[i],
+                ((DTYPE *)B)[i], i);
+      // return 1;
       error++;
     }
 
   return error;
 }
 
-void check_matrix(block *R, long x, long y, long o, DTYPE v, int* errorf) {
+void check_matrix(block *R, long x, long y, long o, DTYPE v, int *errorf) {
 
-  int a = 0, b = 0;
-
-  if ((x*y) == 1) {
+  if ((x * y) == 1) {
     check_block(R, v, errorf);
     return;
-  } 
+  }
 
-  if (x>y) {
-    cilk_spawn check_matrix(R,x/2,y,o,v, errorf);
-    check_matrix(R+(x/2)*o,(x+1)/2,y,o,v, errorf);
-    cilk_sync;
-  } else {
-    cilk_spawn check_matrix(R,x,y/2,o,v, errorf);
-    check_matrix(R+(y/2),x,(y+1)/2,o,v, errorf);
-    cilk_sync;
+  cilk_scope {
+    if (x > y) {
+      cilk_spawn check_matrix(R, x / 2, y, o, v, errorf);
+      check_matrix(R + (x / 2) * o, (x + 1) / 2, y, o, v, errorf);
+    } else {
+      cilk_spawn check_matrix(R, x, y / 2, o, v, errorf);
+      check_matrix(R + (y / 2), x, (y + 1) / 2, o, v, errorf);
+    }
   }
 }
 
 long long add_block(block *T, block *R) {
 
-  long i;
-
-  for (i = 0; i < BLOCK_SIZE; i += 4) {
-    ((DTYPE *) R)[i] += ((DTYPE *) T)[i];
-    ((DTYPE *) R)[i + 1] += ((DTYPE *) T)[i + 1];
-    ((DTYPE *) R)[i + 2] += ((DTYPE *) T)[i + 2];
-    ((DTYPE *) R)[i + 3] += ((DTYPE *) T)[i + 3];
+  for (long i = 0; i < BLOCK_SIZE; i += 4) {
+    ((DTYPE *)R)[i] += ((DTYPE *)T)[i];
+    ((DTYPE *)R)[i + 1] += ((DTYPE *)T)[i + 1];
+    ((DTYPE *)R)[i + 2] += ((DTYPE *)T)[i + 2];
+    ((DTYPE *)R)[i + 3] += ((DTYPE *)T)[i + 3];
   }
 
   return BLOCK_SIZE;
 }
 
-/* 
- * Add matrix T into matrix R, where T and R are bl blocks in size 
+/*
+ * Add matrix T into matrix R, where T and R are bl blocks in size
  */
 void add_matrix(block *T, long ot, block *R, long orr, long x, long y) {
 
-  if ((x+y)==2) {
-    add_block(T,R);
+  if ((x + y) == 2) {
+    add_block(T, R);
     return;
-  } 
-
-  if (x > y) {
-    cilk_spawn add_matrix(T,ot,R,orr,x/2,y);
-    add_matrix(T+(x/2)*ot,ot,R+(x/2)*orr,orr,(x+1)/2,y);
-  } else {
-    cilk_spawn add_matrix(T,ot,R,orr,x,y/2);
-    add_matrix(T+(y/2),ot,R+(y/2),orr,x,(y+1)/2);
   }
-  cilk_sync;
+
+  cilk_scope {
+    if (x > y) {
+      cilk_spawn add_matrix(T, ot, R, orr, x / 2, y);
+      add_matrix(T + (x / 2) * ot, ot, R + (x / 2) * orr, orr, (x + 1) / 2, y);
+    } else {
+      cilk_spawn add_matrix(T, ot, R, orr, x, y / 2);
+      add_matrix(T + (y / 2), ot, R + (y / 2), orr, x, (y + 1) / 2);
+    }
+  }
 }
 
-void init_block(block* R, DTYPE v) {
+void init_block(block *R, DTYPE v) {
 
   int i;
 
   for (i = 0; i < BLOCK_SIZE; i++)
-    ((DTYPE *) R)[i] = v;
+    ((DTYPE *)R)[i] = v;
 }
 
 void init_matrix(block *R, long x, long y, long o, DTYPE v) {
 
-  if ((x+y)==2) {
-    init_block(R,v);
+  if ((x + y) == 2) {
+    init_block(R, v);
     return;
-  } 
-
-  if (x>y) {
-    cilk_spawn init_matrix(R,x/2,y,o,v);
-    init_matrix(R+(x/2)*o,(x+1)/2,y,o,v);
-
-  } else {
-    cilk_spawn init_matrix(R,x,y/2,o,v);
-    init_matrix(R+(y/2),x,(y+1)/2,o,v);
   }
-  cilk_sync;
+
+  cilk_scope {
+    if (x > y) {
+      cilk_spawn init_matrix(R, x / 2, y, o, v);
+      init_matrix(R + (x / 2) * o, (x + 1) / 2, y, o, v);
+
+    } else {
+      cilk_spawn init_matrix(R, x, y / 2, o, v);
+      init_matrix(R + (y / 2), x, (y + 1) / 2, o, v);
+    }
+  }
 
   return;
 }
 
-void multiply_matrix(block *A, long oa, block *B, long ob, long x, 
-                          long y, long z, block *R, long orr, int add) {
+void multiply_matrix(block *A, long oa, block *B, long ob, long x, long y,
+                     long z, block *R, long orr, int add) {
 
-  if ((x+y+z) == 3) {
+  if ((x + y + z) == 3) {
     if (add)
       mult_add_block(A, B, R);
     else
       multiply_block(A, B, R);
     return;
-  } 
+  }
 
-  if( (x>=y) && (x>=z) ) {
-    cilk_spawn multiply_matrix(A, oa, B, ob, x/2, y, z, R, orr, add);
-    multiply_matrix(A+(x/2)*oa, oa, B, ob, 
-                        (x+1)/2, y, z, R+(x/2)*orr, orr, add);
-  } else {
-
-    if( (y>x) && (y>z) ) {
-      multiply_matrix(A+(y/2), oa,
-                              B+(y/2)*ob, ob, x, (y+1)/2, z, R, orr, add);
-      multiply_matrix(A,oa,B,ob,x,y/2,z,R,orr,1);
+  cilk_scope {
+    if ((x >= y) && (x >= z)) {
+      cilk_spawn multiply_matrix(A, oa, B, ob, x / 2, y, z, R, orr, add);
+      multiply_matrix(A + (x / 2) * oa, oa, B, ob, (x + 1) / 2, y, z,
+                      R + (x / 2) * orr, orr, add);
     } else {
-      cilk_spawn multiply_matrix(A, oa, B, ob, x, y, z/2, R, orr, add);
-      multiply_matrix(A, oa, B+(z/2), ob, x, y, (z+1)/2, 
-                              (R+(z/2)), orr, add);
+
+      if ((y > x) && (y > z)) {
+        multiply_matrix(A + (y / 2), oa, B + (y / 2) * ob, ob, x, (y + 1) / 2,
+                        z, R, orr, add);
+        multiply_matrix(A, oa, B, ob, x, y / 2, z, R, orr, 1);
+      } else {
+        cilk_spawn multiply_matrix(A, oa, B, ob, x, y, z / 2, R, orr, add);
+        multiply_matrix(A, oa, B + (z / 2), ob, x, y, (z + 1) / 2,
+                        (R + (z / 2)), orr, add);
+      }
     }
   }
-  cilk_sync;
-} 
+}
 
 int run(long x, long y, long z, int check) {
 
-  block *A, *B, *R;
+  block *A = (block *)malloc(x * y * sizeof(block));
+  block *B = (block *)malloc(y * z * sizeof(block));
+  block *R = (block *)malloc(x * z * sizeof(block));
 
-  A = (block *) malloc(x*y * sizeof(block));
-  B = (block *) malloc(y*z * sizeof(block));
-  R = (block *) malloc(x*z * sizeof(block));
-
-  cilk_spawn init_matrix(A, x, y, y, 1.0);
-  cilk_spawn init_matrix(B, y, z, z, 1.0); 
-  init_matrix(R, x, z, z, 0.0);
-  cilk_sync;
+  cilk_scope {
+    cilk_spawn init_matrix(A, x, y, y, 1.0);
+    cilk_spawn init_matrix(B, y, z, z, 1.0);
+    init_matrix(R, x, z, z, 0.0);
+  }
 
   struct timeval t1, t2;
-  gettimeofday(&t1,0);
+  gettimeofday(&t1, 0);
 
-  multiply_matrix(A,y,B,z,x,y,z,R,z,0);
+  multiply_matrix(A, y, B, z, x, y, z, R, z, 0);
 
-  gettimeofday(&t2,0);
-  unsigned long long runtime_ms = (todval(&t2)-todval(&t1))/1000;
-  printf("%f\n", runtime_ms/1000.0);
+  gettimeofday(&t2, 0);
+  unsigned long long runtime_ms = (todval(&t2) - todval(&t1)) / 1000;
+  printf("%f\n", runtime_ms / 1000.0);
 
-  if(check) {
+  if (check) {
     printf("Now check result ... \n");
     check = 0;
-    check_matrix(R, x, z, z, y*16, &check);
+    check_matrix(R, x, z, z, y * 16, &check);
   }
 
   if (check) {
     printf("WRONG RESULT!\n");
     printf("check: %d\n", check);
 
-  } else {	
+  } else {
     fprintf(stderr, "\nCilk Example: rectmul\n");
-    fprintf(stderr, "Options: x = %ld\n", BLOCK_EDGE*x);
-    fprintf(stderr, "         y = %ld\n", BLOCK_EDGE*y);
-    fprintf(stderr, "         z = %ld\n\n", BLOCK_EDGE*z);
-    //fprintf(stderr, "flops      = %lld\n", flops);
-    // printf("Mflops     = %4f \n", f);
-
+    fprintf(stderr, "Options: x = %ld\n", BLOCK_EDGE * x);
+    fprintf(stderr, "         y = %ld\n", BLOCK_EDGE * y);
+    fprintf(stderr, "         z = %ld\n\n", BLOCK_EDGE * z);
+    // fprintf(stderr, "flops      = %lld\n", flops);
+    //  printf("Mflops     = %4f \n", f);
   }
 
   free(A);
@@ -439,9 +425,9 @@ int run(long x, long y, long z, int check) {
 
 int usage(void) {
   fprintf(stderr, "Program to multiply two rectangualar matrizes "
-      "A(n,m) * B(m,n), where \n");
+                  "A(n,m) * B(m,n), where \n");
   fprintf(stderr, "(n < m) and (n mod 16 = 0) and (m mod n = 0). "
-      "(Otherwise fill with 0s \n to fit the shape.)\n");
+                  "(Otherwise fill with 0s \n to fit the shape.)\n");
   fprintf(stderr, "Usage: rectmul [<cilk-options>] [<options>]\n\n");
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "  -c   : Check result.\n");
@@ -451,54 +437,57 @@ int usage(void) {
   return 1;
 }
 
-const char *specifiers[] = { "-x", "-y", "-z", "-c", "-benchmark", "-h", 0};
-int opt_types[] = {INTARG, INTARG, INTARG, BOOLARG, BENCHMARK, BOOLARG, 0 };
-
+const char *specifiers[] = {"-x", "-y", "-z", "-c", "-benchmark", "-h", 0};
+int opt_types[] = {INTARG, INTARG, INTARG, BOOLARG, BENCHMARK, BOOLARG, 0};
 
 int main(int argc, char *argv[]) {
 
-  int x, y, z, benchmark, help, t, check;
+  int benchmark, help, t;
 
   /* standard benchmark options */
-  x = 128;
-  y = 128;
-  z = 128;
-  check = 0;
+  int x = 128;
+  int y = 128;
+  int z = 128;
+  int check = 0;
 
-  get_options(argc, argv, specifiers, opt_types, 
-              &x, &y, &z, &check, &benchmark, &help);
+  get_options(argc, argv, specifiers, opt_types, &x, &y, &z, &check, &benchmark,
+              &help);
 
-  if (help) return usage();
+  if (help)
+    return usage();
 
   if (benchmark) {
     switch (benchmark) {
-      case 1:      /* short benchmark options -- a little work*/
-        x = 512;
-        y = 512;
-        z = 512;
-        break;
-      case 2:      /* standard benchmark options*/
-        x = 2048;
-        y = 2048;
-        z = 2048;
-        break;
-      case 3:      /* long benchmark options -- a lot of work*/
-        x = 4096;
-        y = 4096;
-        z = 4096;
-        break;
+    case 1: /* short benchmark options -- a little work*/
+      x = 512;
+      y = 512;
+      z = 512;
+      break;
+    case 2: /* standard benchmark options*/
+      x = 2048;
+      y = 2048;
+      z = 2048;
+      break;
+    case 3: /* long benchmark options -- a lot of work*/
+      x = 4096;
+      y = 4096;
+      z = 4096;
+      break;
     }
   }
 
-  x = x/BLOCK_EDGE;
-  y = y/BLOCK_EDGE;
-  z = z/BLOCK_EDGE;
+  x = x / BLOCK_EDGE;
+  y = y / BLOCK_EDGE;
+  z = z / BLOCK_EDGE;
 
-  if (x<1) x=1;
-  if (y<1) y=1;
-  if (z<1) z=1;
+  if (x < 1)
+    x = 1;
+  if (y < 1)
+    y = 1;
+  if (z < 1)
+    z = 1;
 
-  t = run(x,y,z,check);
+  t = run(x, y, z, check);
 
-  return t; 
+  return t;
 }

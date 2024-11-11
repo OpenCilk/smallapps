@@ -1,4 +1,4 @@
-ALL_TESTS = fft cholesky nqueens qsort rectmul strassen cilksort heat lu matmul
+ALL_TESTS = fft cholesky nqueens qsort rectmul strassen cilksort heat lu matmul fibred
 
 CC ?= clang
 CXX ?= clang++
@@ -43,6 +43,9 @@ strassen: getoptions.o strassen.o
 qsort: qsort.o
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
+fibred: fibred.o
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
 fft cholesky heat : LDLIBS += -lm
 
 # qsort : CXXFLAGS += -falign-functions=32
@@ -57,6 +60,7 @@ nqueensARGS=13
 qsortARGS=50000000
 rectmulARGS=-x 4096 -y 4096 -z 2048
 strassenARGS=-n 4096
+fibredARGS=40
 
 TRIALS=0 1 2 3 4
 
@@ -64,6 +68,9 @@ check-qsort : qsort
 	$(foreach var,$(TRIALS),./$^ ${$^ARGS};)
 
 check-heat : heat
+	$(foreach var,$(TRIALS),./$^ ${$^ARGS};)
+
+check-fibred : fibred
 	$(foreach var,$(TRIALS),./$^ ${$^ARGS};)
 
 check-nqueens : nqueens
