@@ -15,7 +15,7 @@ CXXFLAGS += $(CILKFLAG) $(EXTRA_CFLAGS)
 LDFLAGS += $(CILKFLAG) $(EXTRA_LDFLAGS)
 LDLIBS += $(EXTRA_LDLIBS)
 
-.PHONY : default check clean
+.PHONY : default check one-check clean
 
 default: all
 
@@ -82,6 +82,25 @@ check-% : %
 	$(foreach var,$(TRIALS),./$^ ${$^ARGS};)
 
 check : $(patsubst %,check-%,$(ALL_TESTS))
+
+one-check-qsort : qsort
+	./$^ ${$^ARGS}
+
+one-check-heat : heat
+	./$^ ${$^ARGS}
+
+one-check-fibred : fibred
+	./$^ ${$^ARGS}
+
+one-check-nqueens : nqueens
+	./$^ ${$^ARGS} -c
+	./$^ ${$^ARGS}
+
+one-check-% : %
+	./$^ -c
+	./$^ ${$^ARGS}
+
+one-check : $(patsubst %,one-check-%,$(ALL_TESTS))
 
 clean :
 	rm -f $(ALL_TESTS) *.o *.d* *~

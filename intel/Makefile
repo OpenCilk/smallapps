@@ -5,7 +5,7 @@ CXX ?= clang++
 
 CILKFLAG ?= -fopencilk
 
-.PHONY: default all check clean
+.PHONY: default all check one-check clean
 
 default: all
 
@@ -16,6 +16,9 @@ all:
 
 check:
 	$(foreach test,$(ALL_TESTS),$(foreach var,$(TRIALS),make -C ${test} run;))
+
+one-check:
+	$(foreach test,$(ALL_TESTS),make -C ${test} run;)
 
 clean:
 	$(foreach test,$(ALL_TESTS),make -C ${test} clean;)
