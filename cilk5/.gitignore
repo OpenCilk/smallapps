@@ -2,6 +2,7 @@ cholesky
 cilksort
 fft
 fib
+fibred
 heat
 lu
 matmul
