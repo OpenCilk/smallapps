@@ -83,22 +83,34 @@ check-% : %
 
 check : $(patsubst %,check-%,$(ALL_TESTS))
 
+choleskySMALLARGS=-n 2000 -z 4000
+cilksortSMALLARGS=-n 40000000
+fftSMALLARGS=-n 10000000
+heatSMALLARGS=-nx 2048 -ny 2048 -nt 100
+luSMALLARGS=-n 2048
+matmulSMALLARGS=-n 1024
+nqueensSMALLARGS=12
+qsortSMALLARGS=20000000
+rectmulSMALLARGS=-x 2048 -y 2048 -z 1024
+strassenSMALLARGS=-n 2048
+fibredSMALLARGS=30
+
 one-check-qsort : qsort
-	./$^ ${$^ARGS}
+	./$^ ${$^SMALLARGS}
 
 one-check-heat : heat
-	./$^ ${$^ARGS}
+	./$^ ${$^SMALLARGS}
 
 one-check-fibred : fibred
-	./$^ ${$^ARGS}
+	./$^ ${$^SMALLARGS}
 
 one-check-nqueens : nqueens
-	./$^ ${$^ARGS} -c
-	./$^ ${$^ARGS}
+	./$^ ${$^SMALLARGS} -c
+	./$^ ${$^SMALLARGS}
 
 one-check-% : %
 	./$^ -c
-	./$^ ${$^ARGS}
+	./$^ ${$^SMALLARGS}
 
 one-check : $(patsubst %,one-check-%,$(ALL_TESTS))
 
