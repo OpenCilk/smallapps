@@ -248,6 +248,14 @@ int heat(void) {
   printf("\n   Global Mean absolute error    %10e\n\n", me);
 #endif
 
+  // Free the memory.
+  cilk_for (int i = 0; i < nx; ++i) {
+    free(neww[i]);
+    free(old[i]);
+  }
+  free(neww);
+  free(old);
+
   return 0;
 }
 

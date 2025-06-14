@@ -3244,6 +3244,11 @@ void test_correctness(void) {
       printf("n=%d ok\n", n);
   }
 
+  free(in1);
+  free(in2);
+  free(out1);
+  free(out2);
+
   return;
 }
 
